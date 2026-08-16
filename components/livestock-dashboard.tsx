@@ -249,6 +249,7 @@ export function LivestockDashboard({
             className="absolute inset-0 flex flex-col"
             minHeight="100%"
             variant="registry"
+            popOutTitle="Livestock Keepers by Region"
             valueLabel="keepers"
             valueFormatter={(value: number) => formatCompact(value)}
             currentFilters={{

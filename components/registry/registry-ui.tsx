@@ -5,6 +5,7 @@
 // views can match the OpenG2P reference design without restyling every tab.
 
 import React from "react"
+import { AlertTriangle, CircleAlert, Info } from "lucide-react"
 
 export const REGISTRY_COLORS = {
   card: "#FFFFFF",
@@ -77,6 +78,8 @@ export const STAT_TINTS = {
   teal: { from: "#D8F1F8", to: "#F7FCFE", border: "#C7E8F1" },
   amber: { from: "#FBEFD2", to: "#FEFBF3", border: "#F5E3B8" },
   pink: { from: "#FBE0EE", to: "#FEF7FB", border: "#F6CFE3" },
+  /** Reserved for figures that report a failure, not just a low value. */
+  red: { from: "#FBD9D9", to: "#FEF6F6", border: "#F4C0C0" },
 } as const
 
 export type StatTint = keyof typeof STAT_TINTS
@@ -128,6 +131,9 @@ export function RegistryCard({
   title,
   subtitle,
   actions,
+  icon,
+  iconBg = BRIGHT_SOFT.blue,
+  iconColor = BRIGHT.blue,
   children,
   className = "",
   bodyClassName = "",
@@ -136,6 +142,10 @@ export function RegistryCard({
   title?: React.ReactNode
   subtitle?: React.ReactNode
   actions?: React.ReactNode
+  /** Tinted tile before the title, so a card can be identified without reading it. */
+  icon?: React.ReactNode
+  iconBg?: string
+  iconColor?: string
   children: React.ReactNode
   className?: string
   bodyClassName?: string
@@ -148,7 +158,15 @@ export function RegistryCard({
       style={{ borderColor: REGISTRY_COLORS.line, boxShadow: CARD_SHADOW }}
     >
       {(title || actions) && (
-        <div className={`flex items-start gap-3 ${dense ? "px-3 pt-2" : "px-4 pt-3"}`}>
+        <div className={`flex items-start gap-2 ${dense ? "px-3 pt-2" : "px-4 pt-3"}`}>
+          {icon && (
+            <span
+              className={`grid flex-none place-items-center rounded-[7px] ${dense ? "h-5 w-5" : "h-6 w-6"}`}
+              style={{ background: iconBg, color: iconColor }}
+            >
+              {icon}
+            </span>
+          )}
           <div className="min-w-0">
             {title && (
               <h3
@@ -362,6 +380,7 @@ export function RegistryStat({
   delta,
   note,
   tint,
+  size = "default",
   loading = false,
 }: {
   icon: React.ReactNode
@@ -377,27 +396,108 @@ export function RegistryStat({
   note?: string
   /** Washes the card in a tint instead of plain white. */
   tint?: StatTint
+  /**
+   * "lg" stacks the label above the figure instead of setting it beside the
+   * icon. In a narrow column that is the only way to grow the card: the label
+   * gets the full width, so it can be larger without truncating.
+   */
+  size?: "default" | "lg"
   loading?: boolean
 }) {
   const direction = !delta || Math.abs(delta.percent) < 0.05 ? "flat" : delta.percent > 0 ? "up" : "down"
   const deltaColor = { up: BRIGHT.green, down: BRIGHT.red, flat: "#64748B" }[direction]
   const arrow = direction === "up" ? "▲" : direction === "down" ? "▼" : "–"
   const wash = tint ? STAT_TINTS[tint] : null
+  const large = size === "lg"
+
+  const caption =
+    delta && !loading ? (
+      <div
+        className={large ? "text-[11px] font-semibold leading-tight" : "truncate text-[10.5px] font-semibold leading-tight"}
+        style={{ color: deltaColor }}
+      >
+        {arrow} {Math.abs(delta.percent).toFixed(1)}%{" "}
+        <span className="font-normal" style={{ color: REGISTRY_COLORS.muted }}>
+          {delta.note}
+        </span>
+      </div>
+    ) : !delta && note && !loading ? (
+      <div
+        className={large ? "text-[11px] leading-tight" : "truncate text-[10.5px] leading-tight"}
+        style={{ color: REGISTRY_COLORS.muted }}
+      >
+        {note}
+      </div>
+    ) : null
+
+  const figure = (
+    <div className="flex items-baseline gap-1">
+      <span
+        className={
+          large
+            ? "truncate text-[26px] font-bold leading-[1.1] tracking-[-0.7px] @[1180px]:text-[28px]"
+            : "truncate text-[21px] font-bold leading-[1.15] tracking-[-0.6px] @[1100px]:text-[24px]"
+        }
+        style={{ color: valueColor || REGISTRY_COLORS.ink }}
+      >
+        {loading ? "—" : value}
+      </span>
+      {unit && !loading && (
+        <span
+          className={
+            large ? "text-[13px] font-semibold @[1180px]:text-[14px]" : "text-[11.5px] font-semibold @[1100px]:text-[13px]"
+          }
+          style={{ color: REGISTRY_COLORS.ink2 }}
+        >
+          {unit}
+        </span>
+      )}
+    </div>
+  )
+
+  const cardStyle = {
+    background: wash ? `linear-gradient(135deg, ${wash.from} 0%, ${wash.to} 100%)` : REGISTRY_COLORS.card,
+    borderColor: wash ? wash.border : REGISTRY_COLORS.line,
+    boxShadow: CARD_SHADOW,
+  }
+
+  if (large) {
+    return (
+      <div className="flex min-w-0 flex-col gap-1 rounded-xl border px-3 py-2" style={cardStyle}>
+        <div className="flex items-start gap-2">
+          <div
+            className={
+              wash
+                ? "grid h-8 w-8 flex-none place-items-center"
+                : "grid h-8 w-8 flex-none place-items-center rounded-[9px]"
+            }
+            style={wash ? { color: iconColor } : { background: iconBg, color: iconColor }}
+          >
+            {icon}
+          </div>
+          <div
+            className="min-w-0 flex-1 text-[13px] font-semibold leading-[1.25] @[1180px]:text-[13.5px]"
+            style={{ color: wash ? "#475569" : REGISTRY_COLORS.muted }}
+            title={label}
+          >
+            {label}
+          </div>
+        </div>
+        <div className="min-w-0">
+          {figure}
+          {caption}
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div
-      className="flex min-w-0 items-center gap-2 rounded-xl border px-2.5 py-2"
-      style={{
-        background: wash ? `linear-gradient(135deg, ${wash.from} 0%, ${wash.to} 100%)` : REGISTRY_COLORS.card,
-        borderColor: wash ? wash.border : REGISTRY_COLORS.line,
-        boxShadow: CARD_SHADOW,
-      }}
-    >
+    <div className="flex min-w-0 items-center gap-2.5 rounded-xl border px-3.5 py-2.5" style={cardStyle}>
       <div
         className={
           wash
-            ? "grid h-11 w-11 flex-none place-items-center"
-            : "grid h-[34px] w-[34px] flex-none place-items-center rounded-[10px]"
+            ? "grid h-12 w-12 flex-none place-items-center"
+            : "grid h-10 w-10 flex-none place-items-center rounded-[10px]"
         }
         style={wash ? { color: iconColor } : { background: iconBg, color: iconColor }}
       >
@@ -406,38 +506,14 @@ export function RegistryStat({
 
       <div className="min-w-0 flex-1">
         <div
-          className="truncate text-[10.5px] leading-tight"
+          className="truncate text-[12.5px] font-medium leading-tight @[1100px]:text-[13px]"
           style={{ color: wash ? "#475569" : REGISTRY_COLORS.muted }}
           title={label}
         >
           {label}
         </div>
-        <div className="flex items-baseline gap-1">
-          <span
-            className="truncate text-[19px] font-bold leading-[1.15] tracking-[-0.6px] @[1100px]:text-[23px]"
-            style={{ color: valueColor || REGISTRY_COLORS.ink }}
-          >
-            {loading ? "—" : value}
-          </span>
-          {unit && !loading && (
-            <span className="text-[11px] font-semibold @[1100px]:text-[12.5px]" style={{ color: REGISTRY_COLORS.ink2 }}>
-              {unit}
-            </span>
-          )}
-        </div>
-        {delta && !loading && (
-          <div className="truncate text-[9.5px] font-semibold leading-tight" style={{ color: deltaColor }}>
-            {arrow} {Math.abs(delta.percent).toFixed(1)}%{" "}
-            <span className="font-normal" style={{ color: REGISTRY_COLORS.muted }}>
-              {delta.note}
-            </span>
-          </div>
-        )}
-        {!delta && note && !loading && (
-          <div className="truncate text-[9.5px] leading-tight" style={{ color: REGISTRY_COLORS.muted }}>
-            {note}
-          </div>
-        )}
+        {figure}
+        {caption}
       </div>
     </div>
   )
@@ -487,6 +563,7 @@ export function ProgressRow({
   percent,
   color = BRIGHT.blueSoft,
   icon,
+  iconColor,
   barWidth = "72px",
 }: {
   label: string
@@ -494,6 +571,8 @@ export function ProgressRow({
   percent: number
   color?: string
   icon?: React.ReactNode
+  /** Ties the icon to the bar colour when rows represent different categories. */
+  iconColor?: string
   barWidth?: string
 }) {
   const width = Math.max(0, Math.min(100, percent))
@@ -504,7 +583,7 @@ export function ProgressRow({
       style={{ gridTemplateColumns: `${icon ? "16px " : ""}minmax(0,1fr) ${barWidth} auto` }}
     >
       {icon && (
-        <span className="grid h-4 w-4 place-items-center" style={{ color: REGISTRY_COLORS.muted }}>
+        <span className="grid h-4 w-4 place-items-center" style={{ color: iconColor || REGISTRY_COLORS.muted }}>
           {icon}
         </span>
       )}
@@ -561,6 +640,110 @@ export function AlertRow({
         <span className="mt-0.5 block text-[10px] leading-snug" style={{ color: REGISTRY_COLORS.muted }}>
           {detail}
         </span>
+      </span>
+    </div>
+  )
+}
+
+/**
+ * Severity palette for fault reporting. `wash` is the card background, `bg` the
+ * icon tile, and `rank` orders the most serious checks to the top of a list.
+ */
+export const SEVERITY_TONES = {
+  danger: { bg: BRIGHT_SOFT.red, wash: "#FEF2F2", color: BRIGHT.crimson, label: "Critical", rank: 0 },
+  warning: { bg: BRIGHT_SOFT.amber, wash: "#FFFBEB", color: "#B45309", label: "Warning", rank: 1 },
+  info: { bg: BRIGHT_SOFT.blue, wash: "#EFF6FF", color: "#1D4ED8", label: "Coverage", rank: 2 },
+} as const
+
+export type Severity = keyof typeof SEVERITY_TONES
+
+/** Fault count as a filled badge, so a non-zero value cannot be skimmed past. */
+export function FaultBadge({ count }: { count: number }) {
+  if (count <= 0) {
+    return (
+      <span className="text-[10.5px] font-semibold" style={{ color: BRIGHT.green }}>
+        Clear
+      </span>
+    )
+  }
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+      style={{ background: BRIGHT_SOFT.red, color: BRIGHT.crimson }}
+    >
+      <CircleAlert className="h-2.5 w-2.5" />
+      {formatFull(count)}
+    </span>
+  )
+}
+
+/** Header chip that puts the critical fault count next to a card title. */
+export function CriticalCountChip({ count, noun = "critical" }: { count: number; noun?: string }) {
+  if (count <= 0) return null
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
+      style={{ background: BRIGHT.crimson, color: "#fff" }}
+    >
+      <CircleAlert className="h-3 w-3" />
+      {count} {noun}
+    </span>
+  )
+}
+
+/**
+ * A single tripped check, rendered as a tinted card with a severity accent bar
+ * so faults read as alerts rather than as another table row.
+ */
+export function FaultAlert({
+  severity,
+  title,
+  context,
+  value,
+  label,
+}: {
+  severity: Severity
+  title: string
+  context: string
+  value: string
+  /** Replaces the tone's default caption when the domain names severities itself. */
+  label?: string
+}) {
+  const tone = SEVERITY_TONES[severity] || SEVERITY_TONES.info
+
+  return (
+    <div
+      className="flex items-center gap-2 rounded-[8px] border-l-[3px] py-1 pl-1.5 pr-2"
+      style={{ background: tone.wash, borderColor: tone.color }}
+    >
+      <span
+        className="grid h-5 w-5 flex-none place-items-center rounded-[6px]"
+        style={{ background: tone.bg, color: tone.color }}
+      >
+        {severity === "danger" ? (
+          <CircleAlert className="h-3 w-3" />
+        ) : severity === "warning" ? (
+          <AlertTriangle className="h-3 w-3" />
+        ) : (
+          <Info className="h-3 w-3" />
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <strong
+          className="block truncate text-[10.5px] font-semibold leading-tight"
+          style={{ color: REGISTRY_COLORS.ink }}
+          title={title}
+        >
+          {title}
+        </strong>
+        <span className="block truncate text-[9px] leading-tight" style={{ color: tone.color }}>
+          {context} · {label ?? tone.label}
+        </span>
+      </span>
+      <span className="flex-none text-[14px] font-bold leading-none" style={{ color: tone.color }}>
+        {value}
       </span>
     </div>
   )

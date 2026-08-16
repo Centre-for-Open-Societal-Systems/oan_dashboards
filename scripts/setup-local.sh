@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Bootstrap a local Postgres database with synthetic farmer data + catalogs.
+# Bootstrap a local Postgres database with synthetic farmer data, catalogs and
+# A2C (Access to Credit) sample data.
 #
 # Prerequisites: PostgreSQL (createdb/psql), Node.js, npm dependencies installed.
 #
@@ -70,6 +71,14 @@ node "$ROOT/scripts/seed-local-db.js" "$@"
 echo ""
 echo "=== Loading catalog data ==="
 "$ROOT/scripts/load-catalog-data.sh"
+
+echo ""
+echo "=== Loading A2C (Access to Credit) sample data ==="
+"$ROOT/scripts/load-a2c-data.sh"
+
+echo ""
+echo "=== Loading DevOps monitoring mock data ==="
+"$ROOT/scripts/load-devops-data.sh"
 
 echo ""
 echo "Local database is ready. Start the app with: npm run dev"

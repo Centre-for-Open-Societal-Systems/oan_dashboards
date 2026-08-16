@@ -112,6 +112,46 @@ async function convertPcodsToIds(filters: any) {
   }
 }
 
+const DYNAMIC_FILTERS = '--- DYNAMIC_FILTERS ---'
+const A2C_GEO_FILTERS = '--- A2C_GEO_FILTERS ---'
+const A2C_PROVIDER_FILTERS = '--- A2C_PROVIDER_FILTERS ---'
+
+// A2C tables carry HDX P-codes and their own provider ids, so its filters are
+// matched against the raw codes inside the A2C_SCOPE views and must bypass the
+// g2p id conversion the registry queries depend on.
+const a2cGeoColumns = {
+  region: 'region_pcode',
+  zone: 'zone_pcode',
+  woreda: 'woreda_pcode',
+} as const
+
+// Both clauses are numbered in the order the placeholders appear in A2C_SCOPE
+// (geography first), so the returned values line up with the $n they fill.
+function buildA2CClauses(filters: ChartFilters): { geo: string; provider: string; values: any[] } {
+  const values: any[] = []
+  const geo: string[] = []
+
+  for (const [key, column] of Object.entries(a2cGeoColumns)) {
+    const value = filters[key as keyof ChartFilters]
+    if (value && value !== 'all') {
+      geo.push(`${column} = $${values.length + 1}`)
+      values.push(value)
+    }
+  }
+
+  let provider = ''
+  if (filters.provider && filters.provider !== 'all') {
+    provider = `AND id = $${values.length + 1}::integer`
+    values.push(filters.provider)
+  }
+
+  return {
+    geo: geo.length > 0 ? `AND ${geo.join(' AND ')}` : '',
+    provider,
+    values,
+  }
+}
+
 const chartFilterOverrides: Record<string, FilterOverrides> = {
   farmersByWoreda: {
     region: 'rp.region',
@@ -137,6 +177,35 @@ const chartFilterOverrides: Record<string, FilterOverrides> = {
   },
 }
 
+// Resolves a chart's SQL and its bind values. Which filter dialect a query
+// speaks is decided by the placeholder it carries, so callers need not know
+// whether a chart is a registry, reference-data or A2C query.
+function prepareChartSql(
+  chartName: string,
+  baseQuery: string,
+  filters: ChartFilters,
+  convertedFilters: ChartFilters
+): { sql: string; values: any[] } {
+  if (baseQuery.includes(A2C_GEO_FILTERS)) {
+    const { geo, provider, values } = buildA2CClauses(filters)
+    return {
+      sql: baseQuery.replace(A2C_GEO_FILTERS, geo).replace(A2C_PROVIDER_FILTERS, provider),
+      values,
+    }
+  }
+
+  // Reference-data queries (national catalogues, infrastructure) carry no
+  // placeholder at all, so their parameter list must stay empty or pg rejects
+  // the bind.
+  if (!baseQuery.includes(DYNAMIC_FILTERS)) {
+    return { sql: baseQuery, values: [] }
+  }
+
+  const overrides = chartFilterOverrides[chartName] || undefined
+  const { clause, values } = buildWhereClause(convertedFilters, overrides)
+  return { sql: baseQuery.replace(DYNAMIC_FILTERS, clause), values }
+}
+
 async function executeChartQuery(chartName: string, filters: ChartFilters, convertedFilters?: ChartFilters) {
   const cacheKey = generateCacheKey(`chart:${chartName}`, filters)
 
@@ -156,15 +225,9 @@ async function executeChartQuery(chartName: string, filters: ChartFilters, conve
     }
 
     const filtersForQuery = convertedFilters || await convertPcodsToIds(filters)
-    const overrides = chartFilterOverrides[chartName] || undefined
-    const { clause, values } = buildWhereClause(filtersForQuery, overrides)
+    const { sql, values } = prepareChartSql(chartName, baseQuery, filters, filtersForQuery)
 
-    // Reference-data queries (national catalogues) carry no filter placeholder,
-    // so their parameter list must stay empty or pg rejects the bind.
-    const isFilterable = baseQuery.includes('--- DYNAMIC_FILTERS ---')
-    const finalSql = isFilterable ? baseQuery.replace('--- DYNAMIC_FILTERS ---', clause) : baseQuery
-
-    const { rows } = await pool.query(finalSql, isFilterable ? values : [])
+    const { rows } = await pool.query(sql, values)
     const executionTime = Math.round(performance.now() - startTime)
 
     result = {
@@ -202,6 +265,7 @@ function parseChartFilters(query: Context['query']): ChartFilters {
     kebele: (query.kebele as string) || 'all',
     farmingType: (query.farmingType as string) || 'all',
     farmerType: (query.farmerType as string) || 'all',
+    provider: (query.provider as string) || 'all',
   }
 }
 
@@ -544,6 +608,7 @@ export function createElysiaApp(prefix = '/api') {
         dateFrom: (query.dateFrom as string) || undefined,
         dateTo: (query.dateTo as string) || undefined,
         sector: (query.sector as string) || undefined,
+        provider: (query.provider as string) || undefined,
       }
 
       Object.keys(filters).forEach(key => {
@@ -622,15 +687,14 @@ export function createElysiaApp(prefix = '/api') {
           kebele: (query.kebele as string) || 'all',
           farmingType: (query.farmingType as string) || 'all',
           farmerType: (query.farmerType as string) || 'all',
+          provider: (query.provider as string) || 'all',
         }
 
         const convertedFilters = await convertPcodsToIds(filters)
-        const overrides = chartFilterOverrides[chartName] || undefined
-        const { clause, values } = buildWhereClause(convertedFilters, overrides)
-        const finalSql = baseQuery.replace('--- DYNAMIC_FILTERS ---', clause)
+        const { sql, values } = prepareChartSql(chartName, baseQuery, filters, convertedFilters)
 
         const startTime = Date.now()
-        const result = await pool.query(finalSql, values)
+        const result = await pool.query(sql, values)
         const executionTime = Date.now() - startTime
 
         return { success: true, data: result.rows, executionTime }

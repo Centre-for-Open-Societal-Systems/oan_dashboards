@@ -17,6 +17,15 @@ import { RegistryFilters } from "@/components/registry/registry-data"
 type ExportFormat = "image" | "pdf" | "csv"
 type ExportState = "idle" | "busy" | "done" | "error"
 
+/**
+ * One table in a multi-table CSV. Used by the reference dashboards, which have
+ * no farmer records to export and instead dump the panels they display.
+ */
+export type CsvSection = {
+  name: string
+  rows: Array<Record<string, unknown>>
+}
+
 const BUSY_LABEL: Record<ExportFormat, string> = {
   image: "Rendering image",
   pdf: "Building PDF",
@@ -30,6 +39,35 @@ function triggerDownload(href: string, filename: string) {
   link.href = href
   link.download = filename
   link.click()
+}
+
+function csvCell(value: unknown): string {
+  if (value === null || value === undefined) return ""
+  const text = String(value)
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+/**
+ * Serialises the panels of a dashboard into one CSV, each panel as its own
+ * titled block. Column order follows the first row and widens to cover any
+ * keys later rows introduce.
+ */
+function sectionsToCsv(sections: CsvSection[]): string {
+  return sections
+    .filter(section => section.rows.length > 0)
+    .map(section => {
+      const columns: string[] = []
+      section.rows.forEach(row => {
+        Object.keys(row).forEach(key => {
+          if (!columns.includes(key)) columns.push(key)
+        })
+      })
+
+      const header = columns.map(csvCell).join(",")
+      const body = section.rows.map(row => columns.map(column => csvCell(row[column])).join(","))
+      return [`# ${section.name}`, header, ...body].join("\r\n")
+    })
+    .join("\r\n\r\n")
 }
 
 /**
@@ -63,15 +101,22 @@ async function captureTargetPng(targetId: string): Promise<string> {
 
 /**
  * Compact multi-format export for a dashboard view. Offers an image (PNG) and
- * PDF snapshot of the current layout plus a CSV of the filtered records. Sized
+ * PDF snapshot of the current layout plus a CSV of the underlying data. Sized
  * to sit in the source/goal ribbon at the foot of a dashboard.
+ *
+ * The CSV comes from whichever source the view actually has: registry views
+ * pass `filters` and the server returns the matching farmer records, while
+ * reference views (catalogues, A2C, DevOps) have no farmer records and pass
+ * `csvSections` to export the panels on screen instead.
  */
 export function ExportDataButton({
   filters,
+  csvSections,
   filePrefix,
   captureTargetId,
 }: {
-  filters: RegistryFilters
+  filters?: RegistryFilters
+  csvSections?: () => CsvSection[]
   filePrefix: string
   captureTargetId: string
 }) {
@@ -104,6 +149,16 @@ export function ExportDataButton({
 
   const exportCsv = async () => {
     const filename = `${baseName()}.csv`
+
+    if (csvSections) {
+      const csv = sectionsToCsv(csvSections())
+      if (!csv) throw new Error("Nothing to export yet")
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }))
+      triggerDownload(url, filename)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      return
+    }
+
     const response = await fetch("/api/data/export", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -1,0 +1,7 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm.
+components/ui/calendar.tsx(87,9): error TS2353: Object literal may only specify known properties, and 'table' does not exist in type 'Partial<ClassNames>'.
+components/ui/resizable.tsx(12,51): error TS2339: Property 'PanelGroup' does not exist on type 'typeof import("/Users/malcolmmoodley28/Dev/oan_dashboards/node_modules/react-resizable-panels/dist/react-resizable-panels")'.
+components/ui/resizable.tsx(14,25): error TS2339: Property 'PanelGroup' does not exist on type 'typeof import("/Users/malcolmmoodley28/Dev/oan_dashboards/node_modules/react-resizable-panels/dist/react-resizable-panels")'.
+components/ui/resizable.tsx(35,51): error TS2339: Property 'PanelResizeHandle' does not exist on type 'typeof import("/Users/malcolmmoodley28/Dev/oan_dashboards/node_modules/react-resizable-panels/dist/react-resizable-panels")'.
+components/ui/resizable.tsx(39,25): error TS2339: Property 'PanelResizeHandle' does not exist on type 'typeof import("/Users/malcolmmoodley28/Dev/oan_dashboards/node_modules/react-resizable-panels/dist/react-resizable-panels")'.
+components/ui/resizable.tsx(52,26): error TS2339: Property 'PanelResizeHandle' does not exist on type 'typeof import("/Users/malcolmmoodley28/Dev/oan_dashboards/node_modules/react-resizable-panels/dist/react-resizable-panels")'.

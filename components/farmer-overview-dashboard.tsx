@@ -42,7 +42,6 @@ import {
   RegistryStat,
   SegmentRow,
   SplitBar,
-  StatusPill,
   formatCompact,
   formatFull,
 } from "@/components/registry/registry-ui"
@@ -67,7 +66,6 @@ const CHART_NAMES = [
   "farmersByRecordState",
   "landTenureSplit",
   "registryTrendByMonth",
-  "recentRegistrations",
   "registryCoverage",
 ]
 
@@ -214,8 +212,6 @@ export function FarmerOverviewDashboard({
   const woredasCovered = toNumber(coverage?.woredas_covered)
   const woredaCoverage = woredasTotal > 0 ? (woredasCovered / woredasTotal) * 100 : 0
 
-  const recentRegistrations = charts.recentRegistrations || []
-
   const psnpUsers = useMemo(
     () =>
       toNumber(
@@ -271,7 +267,7 @@ export function FarmerOverviewDashboard({
 
   return (
     <div
-      className="flex h-full min-h-0 flex-col gap-3 @[860px]:grid @[860px]:grid-rows-[auto_minmax(0,182fr)_minmax(0,180fr)_minmax(0,107fr)_auto]"
+      className="flex h-full min-h-0 flex-col gap-3 @[860px]:grid @[860px]:grid-rows-[auto_minmax(0,215fr)_minmax(0,180fr)_minmax(0,92fr)_auto]"
     >
       {/* Band 1 — KPI ribbon (six tiles, content-weighted widths) */}
       <section className="grid flex-none grid-cols-2 gap-3 @[640px]:grid-cols-3 @[860px]:grid-cols-[1.4fr_1.26fr_1.4fr_1.18fr_1.18fr_1.38fr]">
@@ -339,8 +335,36 @@ export function FarmerOverviewDashboard({
         />
       </section>
 
-      {/* Band 2 — snapshot, trend, map, group insights */}
-      <section className="grid min-h-0 flex-none grid-cols-1 gap-3 @[720px]:grid-cols-2 @[860px]:grid-cols-[2.03fr_2.03fr_2.43fr_1.71fr]">
+      {/* Band 2 — map (lead panel), snapshot, trend, group insights */}
+      <section className="grid min-h-0 flex-none grid-cols-1 gap-3 @[720px]:grid-cols-2 @[860px]:grid-cols-[3.05fr_1.9fr_1.9fr_1.55fr]">
+        <RegistryCard
+          dense
+          title="Farmers by Region"
+          subtitle="Click a region to drill down"
+          className="flex min-h-[300px] flex-col overflow-hidden @[860px]:min-h-0"
+          bodyClassName="relative min-h-0 flex-1"
+        >
+          <MapWhenVisible
+            fill
+            legendPosition="overlay"
+            className="absolute inset-0 flex flex-col"
+            minHeight="100%"
+            variant="registry"
+            popOutTitle="Farmers by Region"
+            valueLabel="farmers"
+            valueFormatter={(value: number) => formatCompact(value)}
+            currentFilters={{
+              region: filters.region !== "all" ? filters.region : undefined,
+              zone: filters.zone !== "all" ? filters.zone : undefined,
+              woreda: filters.woreda !== "all" ? filters.woreda : undefined,
+              kebele: filters.kebele !== "all" ? filters.kebele : undefined,
+            }}
+            onFilterChange={(mapFilters: any) => onMapFilterChange?.(mapFilters)}
+            farmerData={farmersByRegion}
+            geoJsonData={geoJsonData}
+          />
+        </RegistryCard>
+
         <RegistryCard
           dense
           title="Registry Snapshot"
@@ -411,33 +435,6 @@ export function FarmerOverviewDashboard({
               </AreaChart>
             </ResponsiveContainer>
           )}
-        </RegistryCard>
-
-        <RegistryCard
-          dense
-          title="Farmers by Region"
-          subtitle="Click a region to drill down"
-          className="flex min-h-[260px] flex-col overflow-hidden @[860px]:min-h-0"
-          bodyClassName="relative min-h-0 flex-1"
-        >
-          <MapWhenVisible
-            fill
-            legendPosition="overlay"
-            className="absolute inset-0 flex flex-col"
-            minHeight="100%"
-            variant="registry"
-            valueLabel="farmers"
-            valueFormatter={(value: number) => formatCompact(value)}
-            currentFilters={{
-              region: filters.region !== "all" ? filters.region : undefined,
-              zone: filters.zone !== "all" ? filters.zone : undefined,
-              woreda: filters.woreda !== "all" ? filters.woreda : undefined,
-              kebele: filters.kebele !== "all" ? filters.kebele : undefined,
-            }}
-            onFilterChange={(mapFilters: any) => onMapFilterChange?.(mapFilters)}
-            farmerData={farmersByRegion}
-            geoJsonData={geoJsonData}
-          />
         </RegistryCard>
 
         <RegistryCard
@@ -689,8 +686,8 @@ export function FarmerOverviewDashboard({
         </RegistryCard>
       </section>
 
-      {/* Band 4 — education, latest records, key indicators */}
-      <section className="grid min-h-0 flex-none grid-cols-1 gap-3 @[720px]:grid-cols-2 @[860px]:grid-cols-[2.15fr_3.52fr_2.63fr]">
+      {/* Band 4 — education, key indicators */}
+      <section className="grid min-h-0 flex-none grid-cols-1 gap-3 @[720px]:grid-cols-2 @[860px]:grid-cols-[1fr_1fr]">
         <RegistryCard
           dense
           title="Education Profile"
@@ -707,61 +704,9 @@ export function FarmerOverviewDashboard({
                 value={`${share(row.value).toFixed(1)}%`}
                 percent={share(row.value)}
                 color={BRIGHT_SERIES[index % BRIGHT_SERIES.length]}
-                barWidth="52px"
+                barWidth="96px"
               />
             ))
-          )}
-        </RegistryCard>
-
-        <RegistryCard
-          dense
-          title="Recent Registrations"
-          subtitle="Latest records for the current filters"
-          className="flex min-h-0 flex-col overflow-hidden"
-          bodyClassName="min-h-0 flex-1 overflow-hidden px-3 pb-2 pt-1"
-        >
-          {recentRegistrations.length === 0 ? (
-            <EmptyPanel message="No registrations for the current filters" />
-          ) : (
-            <div>
-              <div
-                className="grid grid-cols-[44px_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] gap-2 border-b pb-1 text-[9.5px]"
-                style={{ borderColor: REGISTRY_COLORS.line2, color: REGISTRY_COLORS.muted }}
-              >
-                <span>Date</span>
-                <span>Farmer ID</span>
-                <span>Region</span>
-                <span>Woreda</span>
-                <span>Type</span>
-                <span className="text-right">Status</span>
-              </div>
-              {recentRegistrations.map((row: any, index: number) => (
-                <div
-                  key={`${row.farmer_ref}-${index}`}
-                  className="grid grid-cols-[44px_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] items-center gap-2 py-[3px] text-[10.5px]"
-                  style={{ color: REGISTRY_COLORS.ink2 }}
-                >
-                  <span className="whitespace-nowrap" style={{ color: REGISTRY_COLORS.muted }}>
-                    {row.registered_on}
-                  </span>
-                  <span className="truncate font-semibold" style={{ color: REGISTRY_COLORS.ink }} title={row.farmer_ref}>
-                    {row.farmer_ref}
-                  </span>
-                  <span className="truncate" title={row.region}>
-                    {row.region}
-                  </span>
-                  <span className="truncate" title={row.woreda}>
-                    {row.woreda}
-                  </span>
-                  <span className="truncate capitalize" title={String(row.farming_type || "")}>
-                    {String(row.farming_type || "").replace(/_/g, " ")}
-                  </span>
-                  <span className="text-right">
-                    <StatusPill status={row.record_state} />
-                  </span>
-                </div>
-              ))}
-            </div>
           )}
         </RegistryCard>
 

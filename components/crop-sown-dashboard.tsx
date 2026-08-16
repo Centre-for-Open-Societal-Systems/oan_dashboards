@@ -258,6 +258,7 @@ export function CropSownDashboard({
             className="absolute inset-0 flex flex-col"
             minHeight="100%"
             variant="registry"
+            popOutTitle="Hectares Sown by Region"
             valueLabel="hectares"
             valueFormatter={(value: number) => formatCompact(value)}
             childChartKeys={CROP_CHILD_CHARTS}

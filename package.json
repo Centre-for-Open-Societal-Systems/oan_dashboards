@@ -9,7 +9,9 @@
     "lint": "eslint",
     "db:setup": "./scripts/setup-local.sh",
     "db:seed": "node scripts/seed-local-db.js",
-    "db:catalog": "./scripts/load-catalog-data.sh"
+    "db:catalog": "./scripts/load-catalog-data.sh",
+    "db:a2c": "./scripts/load-a2c-data.sh",
+    "db:devops": "./scripts/load-devops-data.sh"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.1.0",

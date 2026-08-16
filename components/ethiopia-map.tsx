@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, Home, MapPin, X, List, Download, Camera, Eye } from "lucide-react"
+import { ChevronLeft, Home, MapPin, X, List, Download, Camera, Eye, Maximize2 } from "lucide-react"
 import { toPng } from "html-to-image"
 import {
   Dialog,
@@ -39,6 +39,8 @@ interface EthiopiaMapProps {
     farmerType?: string;
     recordState?: string;
     farmingType?: string;
+    /** A2C only: the selected credit provider, passed through to drill-down queries. */
+    provider?: string;
   };
   farmerData?: Array<{
     region: string;
@@ -65,6 +67,10 @@ interface EthiopiaMapProps {
   fill?: boolean;
   /** Floats the ramp key over the map instead of stacking it below. */
   legendPosition?: 'below' | 'overlay';
+  /** Heading for the pop-out modal; defaults to a label built from the metric. */
+  popOutTitle?: string;
+  /** Off for the copy rendered inside the pop-out, so it cannot open another one. */
+  allowPopOut?: boolean;
 }
 
 interface GeoJSONFeature {
@@ -280,19 +286,22 @@ const getViewBox = (features: GeoJSONFeature[]) => {
 /** Flat choropleth ramp shared with the registry legend. */
 const REGISTRY_RAMP = ['#F0FDF4', '#BBF7D0', '#4ADE80', '#16A34A', '#15803D'];
 
-export function EthiopiaMap({
-  onFilterChange,
-  currentFilters,
-  farmerData = [],
-  geoJsonData,
-  variant = 'default',
-  valueLabel = 'farmers',
-  valueFormatter,
-  childChartKeys,
-  height = '600px',
-  fill = false,
-  legendPosition = 'overlay',
-}: EthiopiaMapProps) {
+export function EthiopiaMap(props: EthiopiaMapProps) {
+  const {
+    onFilterChange,
+    currentFilters,
+    farmerData = [],
+    geoJsonData,
+    variant = 'default',
+    valueLabel = 'farmers',
+    valueFormatter,
+    childChartKeys,
+    height = '600px',
+    fill = false,
+    legendPosition = 'overlay',
+    popOutTitle,
+    allowPopOut = true,
+  } = props;
   const isRegistry = variant === 'registry';
   const formatValue = useCallback(
     (value: number) => (valueFormatter ? valueFormatter(value) : value.toLocaleString()),
@@ -487,6 +496,10 @@ export function EthiopiaMap({
         }
         if (currentFilters.farmerType && currentFilters.farmerType !== 'all') {
           params.append('farmerType', currentFilters.farmerType);
+        }
+        // A2C only: keeps the drill-down series on the same lender as the panels.
+        if (currentFilters.provider && currentFilters.provider !== 'all') {
+          params.append('provider', currentFilters.provider);
         }
 
         const response = await fetch(`/api/charts?${params.toString()}`);
@@ -816,6 +829,12 @@ export function EthiopiaMap({
     ? 'flex items-center justify-center w-[29px] h-[29px] rounded-lg border-[#E6EAE8] bg-white text-[#4B5563] shadow-sm hover:bg-[#F7FAF8]'
     : 'flex items-center justify-center w-8 h-8 bg-background/80 backdrop-blur-sm'
 
+  // Callers that own a card title pass it through; the rest fall back to the
+  // metric and the level currently on screen.
+  const popOutHeading =
+    popOutTitle ||
+    `${valueLabel.charAt(0).toUpperCase()}${valueLabel.slice(1)} by ${mapLevel.type.replace(/s$/, '')}`
+
   if (!mounted || loading) {
     return (
       <div
@@ -983,6 +1002,34 @@ export function EthiopiaMap({
           >
             <Eye className="h-4 w-4" />
           </Button>
+
+          {/* Pop-out. The modal renders a second copy of the map driven by the
+              same filters and change handler, so drilling in either stays in
+              step; allowPopOut stops that copy offering the control again. */}
+          {allowPopOut && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className={toolButtonClass}
+                  title="Open map in a larger view"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="flex h-[92vh] w-[96vw] max-w-[96vw] flex-col gap-3 p-4 sm:max-w-[96vw]">
+                <DialogHeader className="flex-none pr-8">
+                  <DialogTitle>{popOutHeading}</DialogTitle>
+                </DialogHeader>
+                <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg">
+                  <div className="absolute inset-0 flex flex-col">
+                    <EthiopiaMap {...props} allowPopOut={false} fill height="80vh" />
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
         
         {legendPosition === 'overlay' && (
@@ -1038,22 +1085,21 @@ export function EthiopiaMap({
               );
             })}
 
-            {/* Static labels for screenshot mode */}
+            {/* Static labels for screenshot mode. No backing plate: the text
+                carries a white halo (stroke painted under the fill) so it stays
+                readable over any shade of the choropleth. */}
             {showStaticLabels && staticLabels.map(label => (
-              <g key={`label-${label.id}`}>
-                <rect
-                  x={label.x - 60}
-                  y={label.y - 30}
-                  width={120}
-                  height={45}
-                  rx={4}
-                  className="fill-black/70"
-                />
+              <g key={`label-${label.id}`} className="pointer-events-none">
                 <text
                   x={label.x}
                   y={label.y - 10}
                   textAnchor="middle"
-                  className="fill-white text-xs font-semibold"
+                  className="text-xs font-semibold"
+                  fill="#111827"
+                  stroke="#FFFFFF"
+                  strokeWidth={3}
+                  strokeLinejoin="round"
+                  paintOrder="stroke"
                 >
                   {label.name}
                 </text>
@@ -1061,7 +1107,12 @@ export function EthiopiaMap({
                   x={label.x}
                   y={label.y + 8}
                   textAnchor="middle"
-                  className="fill-yellow-300 text-[11px]"
+                  className="text-[11px] font-medium"
+                  fill="#374151"
+                  stroke="#FFFFFF"
+                  strokeWidth={3}
+                  strokeLinejoin="round"
+                  paintOrder="stroke"
                 >
                   {formatValue(label.count)} {valueLabel}
                 </text>

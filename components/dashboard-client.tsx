@@ -3,7 +3,14 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Download, Menu, X, Camera } from "lucide-react"
-import { GlobalFiltersSidebar } from "@/components/global-filters-sidebar"
+import { GlobalFiltersSidebar, type DashboardType } from "@/components/global-filters-sidebar"
+import {
+  EMPTY_A2C_FILTERS,
+  a2cFilterChips,
+  applyA2CFilterChange,
+  useA2CFilterOptions,
+  type A2CFilters,
+} from "@/hooks/use-a2c-filters"
 import dynamic from "next/dynamic"
 import { DashboardSectionSkeleton } from "@/components/ui/dashboard-skeleton"
 
@@ -35,9 +42,20 @@ export default function DashboardClient({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen)
 
+  const [dashboardType, setDashboardType] = useState<DashboardType>('registries')
+  const isCatalogs = dashboardType === 'catalogs'
+  const isA2C = dashboardType === 'a2c'
+  const isDevOps = dashboardType === 'devops'
+  // Catalogues and DevOps ignore the filters entirely; A2C keeps its own set,
+  // since it is scoped by lender and by its own location codes.
+  const isRegistries = dashboardType === 'registries'
+
+  const [a2cFilters, setA2CFilters] = useState<A2CFilters>(EMPTY_A2C_FILTERS)
+  const { options: a2cOptions } = useA2CFilterOptions(isA2C)
+
   // Crop and livestock farming swap the overview for a dedicated registry view.
   const registryView: 'crop' | 'livestock' | null =
-    filters.farmingType === 'crop' ? 'crop' : filters.farmingType === 'livestock' ? 'livestock' : null
+    !isRegistries ? null : filters.farmingType === 'crop' ? 'crop' : filters.farmingType === 'livestock' ? 'livestock' : null
   const [regionsLookup, setRegionsLookup] = useState<Map<string, { name: string; id: number }>>(new Map())
   const [zonesLookup, setZonesLookup] = useState<Map<string, { name: string; id: number; regionId?: number }>>(new Map())
   const [woredasLookup, setWoredasLookup] = useState<Map<string, { name: string; id: number; zoneId?: number }>>(new Map())
@@ -63,6 +81,30 @@ export default function DashboardClient({
       farmingType: mapFilters.farmingType ?? prev.farmingType,
     }))
   }, [setFiltersIfChanged])
+
+  // Drilling into the loan heat map moves the A2C location filters, so the
+  // sidebar, the chips and the panels all follow the map.
+  const handleA2CMapFilterChange = useCallback(
+    (mapFilters: { region?: string; zone?: string; woreda?: string }) => {
+      setA2CFilters(prev => {
+        const next = {
+          ...prev,
+          region: mapFilters.region ?? 'all',
+          zone: mapFilters.zone ?? 'all',
+          woreda: mapFilters.woreda ?? 'all',
+        }
+        const changed = Object.keys(next).some(key => (prev as any)[key] !== (next as any)[key])
+        return changed ? next : prev
+      })
+    },
+    []
+  )
+
+  const a2cChips = useMemo(() => a2cFilterChips(a2cFilters, a2cOptions), [a2cFilters, a2cOptions])
+
+  const clearA2CFilter = useCallback((key: keyof A2CFilters) => {
+    setA2CFilters(prev => applyA2CFilterChange(prev, key, 'all'))
+  }, [])
 
   // Load region lookup once for name resolution in header tags
   useEffect(() => {
@@ -286,9 +328,9 @@ export default function DashboardClient({
             </div>
           </div>
 
-          {/* Active Filters Display */}
+          {/* Active Filters Display — catalogues and DevOps take no filters */}
           <div className="hidden md:flex flex-1 justify-center px-4 gap-2 flex-wrap">
-            {activeFilterItems.map((filter) => (
+            {isRegistries && activeFilterItems.map((filter) => (
               <div
                 key={filter.key}
                 className="bg-white/10 px-3 py-1 rounded-full text-xs font-medium text-white border border-white/20 flex items-center gap-2"
@@ -298,6 +340,22 @@ export default function DashboardClient({
                   onClick={() => clearFilter(filter.key)}
                   className="hover:bg-white/20 rounded-full p-0.5 transition-colors"
                   aria-label={`Clear ${filter.label} filter`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+
+            {isA2C && a2cChips.map((chip) => (
+              <div
+                key={chip.key}
+                className="bg-white/10 px-3 py-1 rounded-full text-xs font-medium text-white border border-white/20 flex items-center gap-2"
+              >
+                <span>{chip.label}: {chip.value}</span>
+                <button
+                  onClick={() => clearA2CFilter(chip.key)}
+                  className="hover:bg-white/20 rounded-full p-0.5 transition-colors"
+                  aria-label={`Clear ${chip.label} filter`}
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -322,9 +380,15 @@ export default function DashboardClient({
               size="sm"
               className="border-white/30 bg-[#01215A]/80 text-white backdrop-blur-sm hover:bg-[#01215A] hover:text-white"
               onClick={() =>
-                registryView
-                  ? captureElementById(`tab-content-${registryView}-registry`, `${registryView}-registry`)
-                  : captureElementById('dashboard-overview', 'farmer-overview')
+                isCatalogs
+                  ? captureElementById('dashboard-catalogs', 'catalogs')
+                  : isA2C
+                    ? captureElementById('dashboard-a2c', 'a2c-access-to-credit')
+                    : isDevOps
+                      ? captureElementById('dashboard-devops', 'devops-infrastructure')
+                      : registryView
+                        ? captureElementById(`tab-content-${registryView}-registry`, `${registryView}-registry`)
+                        : captureElementById('dashboard-overview', 'farmer-overview')
               }
             >
               <Camera className="h-4 w-4" />
@@ -343,6 +407,10 @@ export default function DashboardClient({
               onFiltersChange={setFilters}
               isSidebarOpen={isSidebarOpen}
               onSidebarToggle={toggleSidebar}
+              dashboardType={dashboardType}
+              onDashboardTypeChange={setDashboardType}
+              a2cFilters={a2cFilters}
+              onA2CFiltersChange={setA2CFilters}
             />
           </div>
 
@@ -362,7 +430,23 @@ export default function DashboardClient({
           // scrolling on shorter viewports so panels are never clipped.
           className="@container flex-1 min-h-0 bg-[#F5F8F6] p-3 md:p-4 overflow-y-auto xl:overflow-hidden"
         >
-          {registryView === 'crop' ? (
+          {isCatalogs ? (
+            <div id="dashboard-catalogs" className="h-full min-h-0">
+              <CatalogsDashboard />
+            </div>
+          ) : isA2C ? (
+            <div id="dashboard-a2c" className="h-full min-h-0">
+              <A2CDashboard
+                filters={a2cFilters}
+                geoJsonData={geoJsonData}
+                onMapFilterChange={handleA2CMapFilterChange}
+              />
+            </div>
+          ) : isDevOps ? (
+            <div id="dashboard-devops" className="h-full min-h-0">
+              <DevOpsDashboard />
+            </div>
+          ) : registryView === 'crop' ? (
             <div id="tab-content-crop-registry" className="h-full min-h-0">
               <CropSownDashboard
                 filters={filters}
@@ -404,6 +488,21 @@ const CropSownDashboard = dynamic(
 
 const LivestockDashboard = dynamic(
   () => import("@/components/livestock-dashboard").then(mod => mod.LivestockDashboard),
+  { ssr: false, loading: () => <TabSkeleton /> }
+)
+
+const CatalogsDashboard = dynamic(
+  () => import("@/components/catalogs-dashboard").then(mod => mod.CatalogsDashboard),
+  { ssr: false, loading: () => <TabSkeleton /> }
+)
+
+const A2CDashboard = dynamic(
+  () => import("@/components/a2c-dashboard").then(mod => mod.A2CDashboard),
+  { ssr: false, loading: () => <TabSkeleton /> }
+)
+
+const DevOpsDashboard = dynamic(
+  () => import("@/components/devops-dashboard").then(mod => mod.DevOpsDashboard),
   { ssr: false, loading: () => <TabSkeleton /> }
 )
 
