@@ -218,6 +218,24 @@ async function executeChartQuery(chartName: string, filters: ChartFilters, conve
   let result: any
 
   try {
+    const pythonEndpoints = ['farmersByRegion', 'farmersByGender', 'farmersByType']
+    if (pythonEndpoints.includes(chartName)) {
+      const qs = new URLSearchParams(Object.entries(filters).filter(([_,v])=>v!=='all')).toString()
+      const url = `http://localhost:8005/api/v1/charts/${chartName}?${qs}`
+      try {
+        const res = await fetch(url)
+        if (res.ok) {
+          const rows = await res.json()
+          const executionTime = Math.round(performance.now() - startTime)
+          const result = { chartName, success: true, data: rows, error: null, executionTime }
+          setCachedData(cacheKey, result)
+          return result
+        }
+      } catch (e) {
+        console.error('Python API fetch failed', e)
+      }
+    }
+
     const baseQuery = CHART_QUERIES[chartName as keyof typeof CHART_QUERIES]
     if (!baseQuery) {
       throw new Error(`Query for chart "${chartName}" not found.`)
@@ -673,7 +691,25 @@ export function createElysiaApp(prefix = '/api') {
       const chartName = params.chartId
 
       try {
-        const baseQuery = CHART_QUERIES[chartName as keyof typeof CHART_QUERIES]
+        const pythonEndpoints = ['farmersByRegion', 'farmersByGender', 'farmersByType']
+    if (pythonEndpoints.includes(chartName)) {
+      const qs = new URLSearchParams(Object.entries(filters).filter(([_,v])=>v!=='all')).toString()
+      const url = `http://localhost:8005/api/v1/charts/${chartName}?${qs}`
+      try {
+        const res = await fetch(url)
+        if (res.ok) {
+          const rows = await res.json()
+          const executionTime = Math.round(performance.now() - startTime)
+          const result = { chartName, success: true, data: rows, error: null, executionTime }
+          setCachedData(cacheKey, result)
+          return result
+        }
+      } catch (e) {
+        console.error('Python API fetch failed', e)
+      }
+    }
+
+    const baseQuery = CHART_QUERIES[chartName as keyof typeof CHART_QUERIES]
         if (!baseQuery) {
           set.status = 404
           return { success: false, error: `Chart query '${chartName}' not found.` }
