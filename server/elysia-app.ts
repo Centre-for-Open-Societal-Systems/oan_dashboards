@@ -207,53 +207,22 @@ function prepareChartSql(
 
 async function executeChartQuery(chartName: string, filters: ChartFilters, convertedFilters?: ChartFilters) {
   const cacheKey = generateCacheKey(`chart:${chartName}`, filters)
-
-  // Reuse cached DB responses to avoid cold-start penalties on repeated filters
-  const cached = getCachedData<any>(cacheKey)
-  if (cached) {
-    return { ...cached, fromCache: true }
-  }
-
   const startTime = performance.now()
   let result: any
 
   try {
-    const pythonEndpoints = ['farmersByRegion', 'farmersByGender', 'farmersByType']
-    if (pythonEndpoints.includes(chartName)) {
-      const qs = new URLSearchParams(Object.entries(filters).filter(([_,v])=>v!=='all')).toString()
-      const url = `http://localhost:8005/api/v1/charts/${chartName}?${qs}`
-      try {
-        const res = await fetch(url)
-        if (res.ok) {
-          const rows = await res.json()
-          const executionTime = Math.round(performance.now() - startTime)
-          const result = { chartName, success: true, data: rows, error: null, executionTime }
-          setCachedData(cacheKey, result)
-          return result
-        }
-      } catch (e) {
-        console.error('Python API fetch failed', e)
-      }
-    }
-
-    const baseQuery = CHART_QUERIES[chartName as keyof typeof CHART_QUERIES]
-    if (!baseQuery) {
-      throw new Error(`Query for chart "${chartName}" not found.`)
-    }
-
-    const filtersForQuery = convertedFilters || await convertPcodsToIds(filters)
-    const { sql, values } = prepareChartSql(chartName, baseQuery, filters, filtersForQuery)
-
-    const activePool = baseQuery.includes('g2p_register_farmers') ? farmerPool : pool
-    const { rows } = await activePool.query(sql, values)
-    const executionTime = Math.round(performance.now() - startTime)
-
-    result = {
-      chartName,
-      success: true,
-      data: rows,
-      error: null,
-      executionTime,
+    const qs = new URLSearchParams(Object.entries(filters).filter(([_,v])=>v!=='all')).toString()
+    const baseUrl = process.env.NEXT_PUBLIC_FARMER_API_BASE || 'http://localhost:8005'
+    const url = `${baseUrl}/api/v1/charts/${chartName}?${qs}`
+    const res = await fetch(url)
+    
+    if (res.ok) {
+      const rows = await res.json()
+      const executionTime = Math.round(performance.now() - startTime)
+      result = { chartName, success: true, data: rows, error: null, executionTime }
+      return result
+    } else {
+       throw new Error('Python API returned ' + res.status)
     }
   } catch (error: any) {
     const executionTime = Math.round(performance.now() - startTime)
@@ -266,11 +235,6 @@ async function executeChartQuery(chartName: string, filters: ChartFilters, conve
       executionTime,
     }
   }
-
-  if (result?.success) {
-    setCachedData(cacheKey, result)
-  }
-
   return result
 }
 
@@ -689,32 +653,7 @@ export function createElysiaApp(prefix = '/api') {
   })
     .get('/charts/:chartId', async ({ params, query, set }) => {
       const chartName = params.chartId
-
       try {
-        const pythonEndpoints = ['farmersByRegion', 'farmersByGender', 'farmersByType']
-    if (pythonEndpoints.includes(chartName)) {
-      const qs = new URLSearchParams(Object.entries(filters).filter(([_,v])=>v!=='all')).toString()
-      const url = `http://localhost:8005/api/v1/charts/${chartName}?${qs}`
-      try {
-        const res = await fetch(url)
-        if (res.ok) {
-          const rows = await res.json()
-          const executionTime = Math.round(performance.now() - startTime)
-          const result = { chartName, success: true, data: rows, error: null, executionTime }
-          setCachedData(cacheKey, result)
-          return result
-        }
-      } catch (e) {
-        console.error('Python API fetch failed', e)
-      }
-    }
-
-    const baseQuery = CHART_QUERIES[chartName as keyof typeof CHART_QUERIES]
-        if (!baseQuery) {
-          set.status = 404
-          return { success: false, error: `Chart query '${chartName}' not found.` }
-        }
-
         const filters: ChartFilters = {
           region: (query.region as string) || 'all',
           recordState: (query.recordState as string) || 'all',
@@ -725,23 +664,12 @@ export function createElysiaApp(prefix = '/api') {
           farmerType: (query.farmerType as string) || 'all',
           provider: (query.provider as string) || 'all',
         }
-
-        const convertedFilters = await convertPcodsToIds(filters)
-        const { sql, values } = prepareChartSql(chartName, baseQuery, filters, convertedFilters)
-
-        const startTime = Date.now()
-        const activePool = baseQuery.includes('g2p_register_farmers') ? farmerPool : pool
-        const result = await activePool.query(sql, values)
-        const executionTime = Date.now() - startTime
-
-        return { success: true, data: result.rows, executionTime }
+        const result = await executeChartQuery(chartName, filters)
+        if (!result.success) set.status = 500
+        return result
       } catch (error: any) {
-        console.error(`API Error for [${chartName}]:`, error)
         set.status = 500
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'An unknown database error occurred'
-        }
+        return { success: false, error: error.message }
       }
     })
 

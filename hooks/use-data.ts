@@ -214,14 +214,6 @@ export function useChartGroupData(
         setLoading(true)
         setError(null)
 
-        // Return cached group if present to avoid extra waits on fast navigations
-        const cached = chartGroupCache.get(cacheKey)
-        if (cached) {
-          setData(cached)
-          setLoading(false)
-          return
-        }
-
         const params = new URLSearchParams()
         params.set('charts', chartKey)
         Object.entries(cleanedFilters).forEach(([key, value]) => {
@@ -257,7 +249,6 @@ export function useChartGroupData(
 
         if (!cancelled) {
           setData(mapped)
-          chartGroupCache.set(cacheKey, mapped)
         }
       } catch (err: any) {
         if (!cancelled) {
