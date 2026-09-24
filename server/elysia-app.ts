@@ -4,7 +4,7 @@ import { performance } from 'perf_hooks'
 import { dataService } from '@/lib/data-service'
 import { validateFilters, ChartFilters as ServiceChartFilters } from '@/lib/chart-data-service'
 import { CHART_QUERIES, ChartFilters } from '@/lib/chart-queries'
-import { pool } from '@/lib/database'
+import { pool, farmerPool } from '@/lib/database'
 import type { Context } from 'elysia'
 import { generateCacheKey, getCachedData, setCachedData } from './cache'
 
@@ -34,7 +34,7 @@ export function resolveFarmingTypeAliases(value: string): string[] {
 
 type FilterOverrides = Partial<Record<keyof ChartFilters, string>>
 
-function buildWhereClause(filters: ChartFilters, overrides?: FilterOverrides): { clause: string; values: any[] } {
+function buildWhereClause(filters: ChartFilters, overrides?: FilterOverrides, usePCodes = false): { clause: string; values: any[] } {
   const conditions: string[] = []
   const values: any[] = []
   let paramIndex = 1
@@ -46,7 +46,7 @@ function buildWhereClause(filters: ChartFilters, overrides?: FilterOverrides): {
       const overrideName = overrides?.[columnKey]
       if (column) {
         const columnName = overrideName || column.name
-        if (column.type === 'integer') {
+        if (column.type === 'integer' && !usePCodes) {
           conditions.push(`${columnName} = $${paramIndex++}::integer`)
           values.push(value)
         } else if (column.type === 'stringSet') {
@@ -194,15 +194,14 @@ function prepareChartSql(
     }
   }
 
-  // Reference-data queries (national catalogues, infrastructure) carry no
-  // placeholder at all, so their parameter list must stay empty or pg rejects
-  // the bind.
   if (!baseQuery.includes(DYNAMIC_FILTERS)) {
     return { sql: baseQuery, values: [] }
   }
 
   const overrides = chartFilterOverrides[chartName] || undefined
-  const { clause, values } = buildWhereClause(convertedFilters, overrides)
+  const isGen2 = baseQuery.includes('g2p_register_farmers')
+  const filtersToUse = isGen2 ? filters : convertedFilters
+  const { clause, values } = buildWhereClause(filtersToUse, overrides, isGen2)
   return { sql: baseQuery.replace(DYNAMIC_FILTERS, clause), values }
 }
 
@@ -227,7 +226,8 @@ async function executeChartQuery(chartName: string, filters: ChartFilters, conve
     const filtersForQuery = convertedFilters || await convertPcodsToIds(filters)
     const { sql, values } = prepareChartSql(chartName, baseQuery, filters, filtersForQuery)
 
-    const { rows } = await pool.query(sql, values)
+    const activePool = baseQuery.includes('g2p_register_farmers') ? farmerPool : pool
+    const { rows } = await activePool.query(sql, values)
     const executionTime = Math.round(performance.now() - startTime)
 
     result = {
@@ -694,7 +694,8 @@ export function createElysiaApp(prefix = '/api') {
         const { sql, values } = prepareChartSql(chartName, baseQuery, filters, convertedFilters)
 
         const startTime = Date.now()
-        const result = await pool.query(sql, values)
+        const activePool = baseQuery.includes('g2p_register_farmers') ? farmerPool : pool
+        const result = await activePool.query(sql, values)
         const executionTime = Date.now() - startTime
 
         return { success: true, data: result.rows, executionTime }

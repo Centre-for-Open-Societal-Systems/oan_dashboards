@@ -1,12 +1,19 @@
 # ATI Farmer Profile Dashboard
 
-Next.js dashboard over a local PostgreSQL database shaped like Odoo / OpenG2P farmer registry tables, plus crop, seed, livestock, and location catalogs.
+Next.js dashboard over a local PostgreSQL database shaped like Odoo / OpenG2P farmer registry tables, plus crop, seed, livestock, and location catalogs. 
+
+It is also integrated with the OpenG2P Gen2 backend to pull live farmer registry data.
+
+## Documentation
+- [System Architecture](docs/architecture.md)
+- [Setup and Development](docs/setup-and-development.md)
+- [Data Integration & Routing](docs/data-integration.md)
 
 Four dashboard types are selectable from the sidebar:
 
 | Dashboard | Shows | Data source |
 |-----------|-------|-------------|
-| **Registries** | Farmer overview, plus crop and livestock registry views, filtered by geography | `scripts/local-schema.sql` + `scripts/seed-local-db.js` |
+| **Registries** | Farmer overview, plus crop and livestock registry views, filtered by geography | Live `farmer_registry_db` via Gen2 + local seed |
 | **Catalogs** | National reference data and the health of the connections feeding it | `data/catalog/` |
 | **A2C - Access to Credit** | Consent-driven loan pipeline for Ethiopian credit providers | `data/a2c/` |
 | **DevOps** | Infrastructure health across registry instances, services, hardware and pipelines | `data/devops/` |

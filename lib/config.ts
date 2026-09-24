@@ -8,15 +8,18 @@
  */
 
 export const DATABASE_CONFIG = {
-  host: process.env.DB_HOST || undefined,
-  port: parseInt(process.env.DB_PORT || '5432'),
-  user: process.env.DB_USER || undefined,
-  password: process.env.DB_PASSWORD || undefined,
-  database: process.env.DB_NAME || undefined,
+  connectionString: process.env.DATABASE_URL,
   max: 20,
-  // Give connections more time to establish and stay alive to avoid drops under load
   idleTimeoutMillis: 30000,
-  // Keep connect timeout short to fail fast instead of hanging the request
+  connectionTimeoutMillis: 3000,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 5000,
+}
+
+export const FARMER_DATABASE_CONFIG = {
+  connectionString: process.env.FARMER_DATABASE_URL,
+  max: 20,
+  idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 3000,
   keepAlive: true,
   keepAliveInitialDelayMillis: 5000,
@@ -121,11 +124,8 @@ export function getEnvVar(key: string, fallback: string = ''): string {
  * Utility function to validate configuration
  */
 export function validateConfig(): boolean {
-  const required = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME']
-  const missing = required.filter(key => !process.env[key] && !DATABASE_CONFIG[key.toLowerCase().replace('db_', '') as keyof typeof DATABASE_CONFIG])
-  
-  if (missing.length > 0) {
-    console.warn('Missing configuration for:', missing.join(', '))
+  if (!process.env.DATABASE_URL) {
+    console.warn('Missing configuration for: DATABASE_URL')
     return false
   }
   

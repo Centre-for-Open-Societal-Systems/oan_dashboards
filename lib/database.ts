@@ -2,11 +2,15 @@
 // Database connection and data fetching functions for MOF Dashboard
 import { Pool } from 'pg'
 import { DataPoint } from './mock-data'
-import { DATABASE_CONFIG } from './config'
+import { DATABASE_CONFIG, FARMER_DATABASE_CONFIG } from './config'
 
 // Create connection pool using centralized configuration
 export const pool = new Pool({
   ...DATABASE_CONFIG
+})
+
+export const farmerPool = new Pool({
+  ...FARMER_DATABASE_CONFIG
 })
 
 // Interface for raw database results
@@ -61,30 +65,25 @@ interface LandRecord {
  * Based on actual database: 22 farmers, 5711 non-farmers, 5733 total registrants
  */
 export async function fetchFarmersData(): Promise<DataPoint[]> {
-  const client = await pool.connect()
+  const client = await farmerPool.connect()
   try {
     const farmersQuery = `
       SELECT
-        rp.id,
-        rp.name,
-        rp.gender,
-        rp.is_farmer,
-        rp.farming_type,
-        rp.total_land_area,
-        rp.registration_date,
-        rp.create_date,
-        reg.name as region_name,
-        reg.code as region_code
-      FROM res_partner rp
-      LEFT JOIN g2p_region reg ON rp.region = reg.id
-      WHERE rp.is_registrant = true
-        AND rp.active = true
-        AND rp.is_farmer = 'yes'
-      ORDER BY rp.registration_date DESC
+        f.functional_record_id as id,
+        f.record_name as name,
+        f.gender,
+        f.main_farming_type as farming_type,
+        f.land_ownership as total_land_area,
+        f.created_at as registration_date,
+        f.created_at as create_date,
+        f.region_name,
+        (SELECT elem->>'level_value_id' FROM jsonb_array_elements(f.geo_code_hierarchy_json->'hierarchy') elem WHERE elem->>'level_mnemonic' = 'region' LIMIT 1) as region_code
+      FROM g2p_register_farmers f
+      WHERE f.record_status = 'ACTIVE'
+      ORDER BY f.created_at DESC
     `
 
     const { rows } = await client.query(farmersQuery)
-
 
     // Return one record per farmer, no synthetic fan-out
     return rows.map((farmer: any): DataPoint => ({
@@ -114,27 +113,24 @@ export async function fetchFarmersData(): Promise<DataPoint[]> {
  * Returns actual statistics: 22 farmers, 5711 non-farmers, 5733 total
  */
 export async function fetchAggregatedStats() {
-  const client = await pool.connect()
+  const client = await farmerPool.connect()
   try {
-    // Farmers by region (only farmers, not all registrants)
+    // Farmers by region
     const farmerRegionStatsQuery = `
       SELECT
-        COALESCE(reg.name, 'Unknown') as region_name,
-        COALESCE(reg.code, 'UNK') as region_code,
+        COALESCE(f.region_name, 'Unknown') as region_name,
+        (SELECT elem->>'level_value_id' FROM jsonb_array_elements(f.geo_code_hierarchy_json->'hierarchy') elem WHERE elem->>'level_mnemonic' = 'region' LIMIT 1) as region_code,
         COUNT(*) as total_farmers,
-        COUNT(CASE WHEN LOWER(rp.gender) = 'male' THEN 1 END) as male_farmers,
-        COUNT(CASE WHEN LOWER(rp.gender) = 'female' THEN 1 END) as female_farmers,
-        COUNT(CASE WHEN rp.gender IS NULL OR rp.gender = '' THEN 1 END) as unknown_gender,
-        AVG(COALESCE(rp.total_land_area, 0)) as avg_land_area,
-        SUM(COALESCE(rp.total_land_area, 0)) as total_land_area,
-        MIN(rp.registration_date) as earliest_registration,
-        MAX(rp.registration_date) as latest_registration
-      FROM res_partner rp
-      LEFT JOIN g2p_region reg ON rp.region = reg.id
-      WHERE rp.is_registrant = true
-        AND rp.active = true
-        AND rp.is_farmer = 'yes'
-      GROUP BY reg.id, reg.name, reg.code
+        COUNT(CASE WHEN LOWER(f.gender) = 'male' THEN 1 END) as male_farmers,
+        COUNT(CASE WHEN LOWER(f.gender) = 'female' THEN 1 END) as female_farmers,
+        COUNT(CASE WHEN f.gender IS NULL OR f.gender = '' THEN 1 END) as unknown_gender,
+        0 as avg_land_area,
+        0 as total_land_area,
+        MIN(f.created_at) as earliest_registration,
+        MAX(f.created_at) as latest_registration
+      FROM g2p_register_farmers f
+      WHERE f.record_status = 'ACTIVE'
+      GROUP BY 1, 2
       ORDER BY total_farmers DESC
     `
 
@@ -143,16 +139,14 @@ export async function fetchAggregatedStats() {
     // Farming type distribution (for farming type charts)
     const farmingTypeQuery = `
       SELECT
-        rp.farming_type as farming_type,
+        f.main_farming_type as farming_type,
         COUNT(*) as count,
-        AVG(COALESCE(rp.total_land_area, 0)) as avg_land_area,
-        SUM(COALESCE(rp.total_land_area, 0)) as total_land_area
-      FROM res_partner rp
-      WHERE rp.is_registrant = true
-        AND rp.active = true
-        AND rp.is_farmer = 'yes'
-        AND rp.farming_type IS NOT NULL
-      GROUP BY rp.farming_type
+        0 as avg_land_area,
+        0 as total_land_area
+      FROM g2p_register_farmers f
+      WHERE f.record_status = 'ACTIVE'
+        AND f.main_farming_type IS NOT NULL
+      GROUP BY f.main_farming_type
       ORDER BY count DESC
     `
 
@@ -162,18 +156,16 @@ export async function fetchAggregatedStats() {
     const farmerSummaryQuery = `
       SELECT
         COUNT(*) as total_farmers,
-        COUNT(CASE WHEN rp.gender IS NOT NULL AND rp.gender != '' THEN 1 END) as farmers_with_gender,
-        COUNT(CASE WHEN rp.farming_type IS NOT NULL AND rp.farming_type != '' THEN 1 END) as farmers_with_type,
-        COUNT(CASE WHEN rp.total_land_area IS NOT NULL AND rp.total_land_area > 0 THEN 1 END) as farmers_with_land,
-        AVG(COALESCE(rp.total_land_area, 0)) as avg_land_area,
-        SUM(COALESCE(rp.total_land_area, 0)) as total_land_area,
-        MIN(rp.total_land_area) as min_land_area,
-        MAX(rp.total_land_area) as max_land_area,
-        COUNT(DISTINCT rp.region) as regions_with_farmers
-      FROM res_partner rp
-      WHERE rp.is_registrant = true
-        AND rp.active = true
-        AND rp.is_farmer = 'yes'
+        COUNT(CASE WHEN f.gender IS NOT NULL AND f.gender != '' THEN 1 END) as farmers_with_gender,
+        COUNT(CASE WHEN f.main_farming_type IS NOT NULL AND f.main_farming_type != '' THEN 1 END) as farmers_with_type,
+        0 as farmers_with_land,
+        0 as avg_land_area,
+        0 as total_land_area,
+        0 as min_land_area,
+        0 as max_land_area,
+        COUNT(DISTINCT f.region_name) as regions_with_farmers
+      FROM g2p_register_farmers f
+      WHERE f.record_status = 'ACTIVE'
     `
 
     const farmerSummaryStats = await client.query(farmerSummaryQuery)
@@ -182,11 +174,10 @@ export async function fetchAggregatedStats() {
     const totalRegistrantsQuery = `
       SELECT
         COUNT(*) as total_registrants,
-        COUNT(CASE WHEN rp.is_farmer = 'yes' THEN 1 END) as total_farmers,
-        COUNT(CASE WHEN rp.is_farmer IS NULL OR rp.is_farmer != 'yes' THEN 1 END) as non_farmers
-      FROM res_partner rp
-      WHERE rp.is_registrant = true
-        AND rp.active = true
+        COUNT(*) as total_farmers,
+        0 as non_farmers
+      FROM g2p_register_farmers f
+      WHERE f.record_status = 'ACTIVE'
     `
 
     const totalRegistrantsStats = await client.query(totalRegistrantsQuery)

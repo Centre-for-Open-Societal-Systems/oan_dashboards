@@ -63,6 +63,24 @@ const A2C_SCOPE = `
   )
 `
 
+export const GEN2_SCOPE = `
+  WITH rp AS (
+    SELECT
+      f.internal_record_id,
+      (SELECT elem->>'level_value_id' FROM jsonb_array_elements(f.geo_code_hierarchy_json->'hierarchy') elem WHERE elem->>'level_mnemonic' = 'region' LIMIT 1) AS region,
+      (SELECT elem->>'level_value_id' FROM jsonb_array_elements(f.geo_code_hierarchy_json->'hierarchy') elem WHERE elem->>'level_mnemonic' = 'zone' LIMIT 1) AS zone,
+      (SELECT elem->>'level_value_id' FROM jsonb_array_elements(f.geo_code_hierarchy_json->'hierarchy') elem WHERE elem->>'level_mnemonic' = 'woreda' LIMIT 1) AS woreda,
+      (SELECT elem->>'level_value_id' FROM jsonb_array_elements(f.geo_code_hierarchy_json->'hierarchy') elem WHERE elem->>'level_mnemonic' = 'kebele' LIMIT 1) AS kebele,
+      f.gender,
+      'Mixed Farming' AS farming_type,
+      'yes' AS is_farmer,
+      TRUE AS is_registrant,
+      FALSE AS is_group
+    FROM g2p_register_farmers f
+    WHERE f.record_status = 'ACTIVE'
+  )
+`
+
 // Base SQL queries for each chart.
 // The API route will replace '--- DYNAMIC_FILTERS ---' with an appropriate
 // parameterized 'AND ...' clause if filters are applied.
@@ -146,13 +164,12 @@ export const CHART_QUERIES: { [key: string]: string } = {
   `,
 
   farmersByGender: `
+    ${GEN2_SCOPE}
     SELECT
       COALESCE(rp.gender, 'Unknown') as gender,
-      COUNT(rp.id) as farmers
-    FROM res_partner rp
-    LEFT JOIN g2p_region reg ON rp.region = reg.id
+      COUNT(DISTINCT rp.internal_record_id) as farmers
+    FROM rp
     WHERE rp.is_registrant = true
-      AND rp.active = true
       AND rp.is_farmer = 'yes'
       --- DYNAMIC_FILTERS ---
     GROUP BY rp.gender
@@ -160,11 +177,11 @@ export const CHART_QUERIES: { [key: string]: string } = {
   `,
 
   farmersByType: `
-   SELECT
+    ${GEN2_SCOPE}
+    SELECT
       COALESCE(rp.farming_type, 'Unknown') as farming_type,
-      COUNT(DISTINCT rp.id) as farmers
-    FROM res_partner rp
-    LEFT JOIN g2p_region reg ON rp.region = reg.id
+      COUNT(DISTINCT rp.internal_record_id) as farmers
+    FROM rp
     WHERE rp.is_farmer = 'yes'
       AND rp.is_registrant = TRUE
       AND rp.is_GROUP = FALSE
@@ -203,32 +220,23 @@ export const CHART_QUERIES: { [key: string]: string } = {
 
 
   farmerKpis: `
-  WITH partners AS (
-      SELECT DISTINCT rp.id, rp.gender, rp.hh_is_household_head, rp.total_land_area, rp.total_land_owned_area
-      FROM res_partner rp
-      WHERE rp.is_farmer = 'yes'
-        AND rp.is_registrant = TRUE
-        AND rp.is_group = FALSE
-        AND rp.active = TRUE
-        --- DYNAMIC_FILTERS ---
-  ),
-  uids AS (
-      SELECT DISTINCT r.partner_id
-      FROM g2p_reg_id r
-      JOIN g2p_id_type t ON r.id_type = t.id AND t.name = 'UID'
-  )
-  SELECT
-      COUNT(*) AS total_farmers,
-      SUM(CASE WHEN LOWER(gender) = 'female' THEN 1 ELSE 0 END) AS female_farmers,
-      SUM(CASE WHEN LOWER(gender) = 'male' THEN 1 ELSE 0 END) AS male_farmers,
-      COALESCE(SUM(total_land_area), 0) AS total_land_size,
-      COALESCE(AVG(total_land_area), 0) AS avg_farm_size,
-      SUM(CASE WHEN LOWER(hh_is_household_head) = 'yes' THEN 1 ELSE 0 END) AS household_heads,
-      SUM(CASE WHEN total_land_owned_area > 0 THEN 1 ELSE 0 END) AS farmers_with_owned_land,
-      COUNT(DISTINCT CASE WHEN id IN (SELECT partner_id FROM uids) THEN id END) AS farmers_with_id,
-      COUNT(*) - COUNT(DISTINCT CASE WHEN id IN (SELECT partner_id FROM uids) THEN id END) AS farmers_without_id
-  FROM partners;
-`,
+    ${GEN2_SCOPE}
+    SELECT
+      COUNT(DISTINCT rp.internal_record_id) AS total_farmers,
+      SUM(CASE WHEN LOWER(rp.gender) = 'female' THEN 1 ELSE 0 END) AS female_farmers,
+      SUM(CASE WHEN LOWER(rp.gender) = 'male' THEN 1 ELSE 0 END) AS male_farmers,
+      0 AS total_land_size,
+      0 AS avg_farm_size,
+      0 AS household_heads,
+      0 AS farmers_with_owned_land,
+      0 AS farmers_with_id,
+      0 AS farmers_without_id
+    FROM rp
+    WHERE rp.is_farmer = 'yes'
+      AND rp.is_registrant = TRUE
+      AND rp.is_group = FALSE
+      --- DYNAMIC_FILTERS ---
+  `,
 
   farmersByImportStatus: `
     SELECT
@@ -1848,3 +1856,6 @@ export const CHART_QUERIES: { [key: string]: string } = {
       i.opened_at DESC
   `,
 };
+
+
+
