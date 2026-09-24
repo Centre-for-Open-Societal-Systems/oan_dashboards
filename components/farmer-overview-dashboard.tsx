@@ -152,8 +152,7 @@ export function FarmerOverviewDashboard({
         .sort((a, b) => b.farmers - a.farmers)
         .slice(0, 6)
         .map((row) => ({
-          name: String(row.region || "Unknown").split(/[\s/]/)[0],
-          percent: share(row.farmers),
+          id: row.region_code || row.region, name: String(row.region || "Unknown").replace(/ Ethiopia( People)?/g, ""), percent: share(row.farmers),
         })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [farmersByRegion, totalFarmers]
