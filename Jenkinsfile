@@ -13,6 +13,10 @@ pipeline {
         AWS_REGION     = "ap-south-1"
         ECR_REGISTRY   = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         ECR_REPOSITORY = "openg2p/oan-dashboards"
+        // A Docker login of this build's own: other pipelines on the same node run
+        // `docker logout` in their post steps, which would otherwise remove the
+        // shared login between this build's `docker login` and `docker push`.
+        DOCKER_CONFIG  = "${env.WORKSPACE}@tmp/docker-config"
 
         HELM_RELEASE   = "oan-dashboards"
         HELM_NAMESPACE = "commons"
