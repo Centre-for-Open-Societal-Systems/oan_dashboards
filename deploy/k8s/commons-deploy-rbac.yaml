@@ -7,44 +7,79 @@
 # grant itself rights. Everything else (the ECR pull secret and its refresher,
 # the Gateway and VirtualService) belongs to the Helm release.
 #
-# The same grants farmer-ci has in `far` and `crop` (farmer-registry
-# ci/k8s/farmer-deploy-rbac.yaml): the built-in admin role in this one
-# namespace, plus Istio objects, which admin does not cover. Jenkins keeps
-# using the farmer-ci kubeconfigs it already has (gen2-dev-kubeconfig,
-# staging-farmer-kubeconfig).
+# `commons` also holds the shared platform's credentials (Keycloak admin,
+# Postgres superuser, Redis), so this is deliberately NOT the namespace `admin`
+# role that farmer-ci has in `far`. It covers only the object types the chart
+# and the pipeline use:
+#   - no read access to Secrets: farmer-ci may create a Secret and manage the
+#     release's own pull secret by name, nothing else. Helm keeps its release
+#     records in ConfigMaps (HELM_DRIVER=configmap in the Jenkinsfile).
+#   - no pods/exec or port-forward: the smoke test goes through the API
+#     server's proxy to the dashboards Service only.
+# Residual risk: anyone allowed to create workloads in a namespace can mount
+# that namespace's Secrets into a pod. Treat the farmer-ci kubeconfigs as
+# having that reach.
 #
-# Check:
-#   kubectl auth can-i create deployments -n commons --as=system:serviceaccount:far:farmer-ci   # yes
-#   kubectl auth can-i create gateways.networking.istio.io -n commons --as=system:serviceaccount:far:farmer-ci   # yes
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: farmer-ci-admin
-  namespace: commons
-subjects:
-  - kind: ServiceAccount
-    name: farmer-ci
-    namespace: far
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: admin
+# Check (all "yes", the last "no"):
+#   A=--as=system:serviceaccount:far:farmer-ci
+#   kubectl auth can-i create deployments -n commons $A
+#   kubectl auth can-i create gateways.networking.istio.io -n commons $A
+#   kubectl auth can-i get services/oan-dashboards:http --subresource=proxy -n commons $A
+#   kubectl auth can-i get secrets -n commons $A
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: ci-deploy-istio
+  name: oan-dashboards-deploy
   namespace: commons
 rules:
-  - apiGroups: ["networking.istio.io", "security.istio.io"]
-    resources: ["*"]
-    verbs: ["*"]
+  # The release's workloads and their hooks
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["services", "serviceaccounts"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Helm release records (HELM_DRIVER=configmap)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # helm --wait, kubectl rollout status, troubleshooting
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "events"]
+    verbs: ["get", "list", "watch"]
+  # The ECR refresher's Role and RoleBinding (it can grant only rules listed here)
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Secrets: create (the pull secret's first write), and the pull secret by name
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["oan-dashboards-ecr"]
+    verbs: ["get", "update", "patch", "delete"]
+  # Public routing
+  - apiGroups: ["networking.istio.io"]
+    resources: ["gateways", "virtualservices"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Smoke test through the API server proxy, to the dashboards Service only
+  - apiGroups: [""]
+    resources: ["services/proxy"]
+    resourceNames: ["oan-dashboards", "oan-dashboards:http", "oan-dashboards:80"]
+    verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: farmer-ci-istio
+  name: farmer-ci-oan-dashboards-deploy
   namespace: commons
 subjects:
   - kind: ServiceAccount
@@ -53,4 +88,4 @@ subjects:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: ci-deploy-istio
+  name: oan-dashboards-deploy
