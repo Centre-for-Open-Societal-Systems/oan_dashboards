@@ -103,6 +103,22 @@ dashboard service yet. For those chart IDs the BFF still runs parameterised SQL 
 
 Moving a chart to a service is described in [Data integration](data-integration.md).
 
+`GET /api/config` reports what a deployment can serve. Without `DATABASE_URL` it offers only the
+Registries dashboard and turns off the crop and livestock registry views. The sidebar and the
+dashboard switch follow it, so a deployment with registry data only never shows a dashboard it
+cannot fill.
+
+## Filter options
+
+The Registries sidebar needs no database:
+- **Geography:** regions, zones and woredas come from the map boundaries (`server/boundaries.ts`),
+  with P-codes as ids. They are the same units the map draws and coverage counts.
+- **Kebeles:** not in the boundaries, so they come from the farmer registry dashboard service
+  (`farmersByKebele`, the kebeles with registered farmers).
+- **Record statuses:** from the service (`farmersByRecordState`).
+
+Served by `GET /api/filter-options` and `GET /api/locations?regionId=|zoneId=|woredaId=`.
+
 ## Frontend
 
 | Area | Location |

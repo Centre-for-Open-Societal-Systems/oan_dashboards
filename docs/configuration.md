@@ -35,8 +35,10 @@ reads its base URL from its own variable.
 
 ## Transitional: direct database access
 
-These are needed only while the Catalogs, Access to Credit and DevOps dashboards (and some
-Registries panels) have no dashboard service yet.
+These are needed only while the Catalogs, Access to Credit and DevOps dashboards (and the crop and
+livestock registry views) have no dashboard service yet. **Leave `DATABASE_URL` unset to run with
+registry data only:** `/api/config` then offers only the Registries dashboard, the crop and livestock
+views stay on the overview, and nothing tries to reach a database.
 
 | Variable | Description |
 | --- | --- |
