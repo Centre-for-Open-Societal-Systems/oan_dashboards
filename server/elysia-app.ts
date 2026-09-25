@@ -4,9 +4,9 @@ import { performance } from 'perf_hooks'
 import { dataService } from '@/lib/data-service'
 import { validateFilters, ChartFilters as ServiceChartFilters } from '@/lib/chart-data-service'
 import { CHART_QUERIES, ChartFilters } from '@/lib/chart-queries'
-import { pool } from '@/lib/database'
+import { pool, farmerPool } from '@/lib/database'
 import type { Context } from 'elysia'
-import { generateCacheKey, getCachedData, setCachedData } from './cache'
+import { getServiceChart, serviceForChart } from './dashboard-services'
 
 const filterColumnMap = {
   region: { name: 'rp.region', type: 'integer' },
@@ -34,7 +34,7 @@ export function resolveFarmingTypeAliases(value: string): string[] {
 
 type FilterOverrides = Partial<Record<keyof ChartFilters, string>>
 
-function buildWhereClause(filters: ChartFilters, overrides?: FilterOverrides): { clause: string; values: any[] } {
+function buildWhereClause(filters: ChartFilters, overrides?: FilterOverrides, usePCodes = false): { clause: string; values: any[] } {
   const conditions: string[] = []
   const values: any[] = []
   let paramIndex = 1
@@ -46,7 +46,7 @@ function buildWhereClause(filters: ChartFilters, overrides?: FilterOverrides): {
       const overrideName = overrides?.[columnKey]
       if (column) {
         const columnName = overrideName || column.name
-        if (column.type === 'integer') {
+        if (column.type === 'integer' && !usePCodes) {
           conditions.push(`${columnName} = $${paramIndex++}::integer`)
           values.push(value)
         } else if (column.type === 'stringSet') {
@@ -71,6 +71,12 @@ function buildWhereClause(filters: ChartFilters, overrides?: FilterOverrides): {
     clause: `AND ${conditions.join(' AND ')}`,
     values,
   }
+}
+
+// P-code → g2p id conversion only matters for local SQL charts; skip the
+// lookups for a batch that is served entirely by dashboard services.
+async function convertFiltersFor(chartNames: string[], filters: any) {
+  return chartNames.every(chart => serviceForChart(chart)) ? filters : convertPcodsToIds(filters)
 }
 
 async function convertPcodsToIds(filters: any) {
@@ -153,17 +159,6 @@ function buildA2CClauses(filters: ChartFilters): { geo: string; provider: string
 }
 
 const chartFilterOverrides: Record<string, FilterOverrides> = {
-  farmersByWoreda: {
-    region: 'rp.region',
-    zone: 'rp.zone',
-    woreda: 'w.id',
-  },
-  farmersByKebele: {
-    region: 'rp.region',
-    zone: 'rp.zone',
-    woreda: 'w.id',
-    kebele: 'k.id',
-  },
   cropAreaByWoreda: {
     region: 'rp.region',
     zone: 'rp.zone',
@@ -194,31 +189,31 @@ function prepareChartSql(
     }
   }
 
-  // Reference-data queries (national catalogues, infrastructure) carry no
-  // placeholder at all, so their parameter list must stay empty or pg rejects
-  // the bind.
   if (!baseQuery.includes(DYNAMIC_FILTERS)) {
     return { sql: baseQuery, values: [] }
   }
 
   const overrides = chartFilterOverrides[chartName] || undefined
-  const { clause, values } = buildWhereClause(convertedFilters, overrides)
+  const isGen2 = baseQuery.includes('g2p_register_farmers')
+  const filtersToUse = isGen2 ? filters : convertedFilters
+  const { clause, values } = buildWhereClause(filtersToUse, overrides, isGen2)
   return { sql: baseQuery.replace(DYNAMIC_FILTERS, clause), values }
 }
 
 async function executeChartQuery(chartName: string, filters: ChartFilters, convertedFilters?: ChartFilters) {
-  const cacheKey = generateCacheKey(`chart:${chartName}`, filters)
-
-  // Reuse cached DB responses to avoid cold-start penalties on repeated filters
-  const cached = getCachedData<any>(cacheKey)
-  if (cached) {
-    return { ...cached, fromCache: true }
-  }
-
   const startTime = performance.now()
   let result: any
 
   try {
+    // Registry charts come from their registry's dashboard service, through a
+    // shared cache (server/dashboard-services.ts). Local SQL below is the
+    // transitional path for charts no service serves yet.
+    if (serviceForChart(chartName)) {
+      const rows = await getServiceChart(chartName, filters)
+      const executionTime = Math.round(performance.now() - startTime)
+      return { chartName, success: true, data: rows, error: null, executionTime }
+    }
+
     const baseQuery = CHART_QUERIES[chartName as keyof typeof CHART_QUERIES]
     if (!baseQuery) {
       throw new Error(`Query for chart "${chartName}" not found.`)
@@ -227,7 +222,8 @@ async function executeChartQuery(chartName: string, filters: ChartFilters, conve
     const filtersForQuery = convertedFilters || await convertPcodsToIds(filters)
     const { sql, values } = prepareChartSql(chartName, baseQuery, filters, filtersForQuery)
 
-    const { rows } = await pool.query(sql, values)
+    const activePool = baseQuery.includes('g2p_register_farmers') ? farmerPool : pool
+    const { rows } = await activePool.query(sql, values)
     const executionTime = Math.round(performance.now() - startTime)
 
     result = {
@@ -249,10 +245,6 @@ async function executeChartQuery(chartName: string, filters: ChartFilters, conve
     }
   }
 
-  if (result?.success) {
-    setCachedData(cacheKey, result)
-  }
-
   return result
 }
 
@@ -270,7 +262,7 @@ function parseChartFilters(query: Context['query']): ChartFilters {
 }
 
 async function runChartGroup(chartNames: string[], filters: ChartFilters) {
-  const convertedFilters = await convertPcodsToIds(filters)
+  const convertedFilters = await convertFiltersFor(chartNames, filters)
   const resultsArray = await Promise.all(chartNames.map(chartId => executeChartQuery(chartId, filters, convertedFilters)))
 
   const data: Record<string, any[]> = {}
@@ -632,7 +624,7 @@ export function createElysiaApp(prefix = '/api') {
       const requestedCharts = (query.charts as string | undefined)?.split(',').filter(Boolean)
       const targetCharts = requestedCharts && requestedCharts.length > 0 ? requestedCharts : Object.keys(CHART_QUERIES)
 
-      const convertedFilters = await convertPcodsToIds(filters as any)
+      const convertedFilters = await convertFiltersFor(targetCharts, filters)
       const resultsArray = await Promise.all(targetCharts.map(chartId => executeChartQuery(chartId, filters as any, convertedFilters)))
 
       const results: Record<string, any> = {}
@@ -671,14 +663,7 @@ export function createElysiaApp(prefix = '/api') {
   })
     .get('/charts/:chartId', async ({ params, query, set }) => {
       const chartName = params.chartId
-
       try {
-        const baseQuery = CHART_QUERIES[chartName as keyof typeof CHART_QUERIES]
-        if (!baseQuery) {
-          set.status = 404
-          return { success: false, error: `Chart query '${chartName}' not found.` }
-        }
-
         const filters: ChartFilters = {
           region: (query.region as string) || 'all',
           recordState: (query.recordState as string) || 'all',
@@ -689,22 +674,12 @@ export function createElysiaApp(prefix = '/api') {
           farmerType: (query.farmerType as string) || 'all',
           provider: (query.provider as string) || 'all',
         }
-
-        const convertedFilters = await convertPcodsToIds(filters)
-        const { sql, values } = prepareChartSql(chartName, baseQuery, filters, convertedFilters)
-
-        const startTime = Date.now()
-        const result = await pool.query(sql, values)
-        const executionTime = Date.now() - startTime
-
-        return { success: true, data: result.rows, executionTime }
+        const result = await executeChartQuery(chartName, filters, await convertFiltersFor([chartName], filters))
+        if (!result.success) set.status = 500
+        return result
       } catch (error: any) {
-        console.error(`API Error for [${chartName}]:`, error)
         set.status = 500
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'An unknown database error occurred'
-        }
+        return { success: false, error: error.message }
       }
     })
 

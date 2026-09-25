@@ -31,6 +31,7 @@ import { KPICard } from "@/components/kpi-card"
 import { formatCompactNumber, formatFullNumber } from "@/lib/number-format"
 import { useChartGroupData } from "@/hooks/use-data"
 import { DashboardSectionSkeleton } from "@/components/ui/dashboard-skeleton"
+import { AGE_BANDS, ageBandLabel } from "@/components/registry/registry-data"
 
 interface FarmerDashboardChartsProps {
   filters: {
@@ -106,12 +107,11 @@ export function FarmerDashboardCharts({ filters, onMapFilterChange, geoJsonData,
   }, [importData])
 
   const ageGenderChartData = useMemo(() => {
-    const ageGroups = ['0-18', '18-30', '30-50', '50-70', '70+', 'Unknown']
     const ageMap = new Map<string, { age_group: string; male: number; female: number; unknown: number }>()
-    ageGroups.forEach(group => ageMap.set(group, { age_group: group, male: 0, female: 0, unknown: 0 }))
+    AGE_BANDS.forEach(group => ageMap.set(group, { age_group: group, male: 0, female: 0, unknown: 0 }))
 
     ageGenderData.forEach((item: any) => {
-      const ageGroup = item.age_group || 'Unknown'
+      const ageGroup = item.age_group || 'UNKNOWN'
       const farmers = parseInt(item.farmers || 0, 10)
       const gender = (item.gender || '').toLowerCase()
       const target = ageMap.get(ageGroup) || { age_group: ageGroup, male: 0, female: 0, unknown: 0 }
@@ -122,7 +122,7 @@ export function FarmerDashboardCharts({ filters, onMapFilterChange, geoJsonData,
     })
 
     const cleaned = Array.from(ageMap.values()).filter(item => !(item.age_group.toLowerCase() === 'unknown' && item.male + item.female + item.unknown === 0))
-    return cleaned
+    return cleaned.map(item => ({ ...item, age_group: ageBandLabel(item.age_group) }))
   }, [ageGenderData])
   const showUnknownAge = useMemo(() => ageGenderChartData.some(item => item.unknown > 0), [ageGenderChartData])
 

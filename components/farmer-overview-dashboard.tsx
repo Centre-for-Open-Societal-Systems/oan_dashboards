@@ -46,11 +46,16 @@ import {
   formatFull,
 } from "@/components/registry/registry-ui"
 import {
+  AGE_BANDS,
   RegistryFilters,
+  ageBandLabel,
   buildTrend,
   monthLabel,
+  tenureLabel,
   toNumber,
   useRegistryTrend,
+  useWoredaUnits,
+  woredaCoverage,
 } from "@/components/registry/registry-data"
 import { ExportDataButton } from "@/components/registry/export-button"
 
@@ -66,19 +71,17 @@ const CHART_NAMES = [
   "farmersByRecordState",
   "landTenureSplit",
   "registryTrendByMonth",
-  "registryCoverage",
+  "farmersByWoreda",
 ]
 
 const TYPE_PALETTE = BRIGHT_SERIES as unknown as string[]
 
 const TENURE_COLORS: Record<string, string> = {
   Owner: BRIGHT.green,
-  Rented: BRIGHT.amber,
-  Shared: BRIGHT.tealSoft,
+  Tenant: BRIGHT.amber,
+  "Crop share": BRIGHT.tealSoft,
   Unknown: "#94A3B8",
 }
-
-const AGE_ORDER = ["0-18", "18-30", "30-50", "50-70", "70+", "Unknown"]
 
 export function FarmerOverviewDashboard({
   filters,
@@ -152,8 +155,7 @@ export function FarmerOverviewDashboard({
         .sort((a, b) => b.farmers - a.farmers)
         .slice(0, 6)
         .map((row) => ({
-          name: String(row.region || "Unknown").split(/[\s/]/)[0],
-          percent: share(row.farmers),
+          id: row.region_code || row.region, name: String(row.region || "Unknown").replace(/ Ethiopia( People)?/g, ""), percent: share(row.farmers),
         })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [farmersByRegion, totalFarmers]
@@ -166,8 +168,8 @@ export function FarmerOverviewDashboard({
       totals.set(group, (totals.get(group) || 0) + toNumber(row.farmers))
     })
 
-    return AGE_ORDER.filter((group) => (totals.get(group) || 0) > 0).map((group) => ({
-      name: group === "70+" ? "70+ years" : `${group} years`,
+    return AGE_BANDS.filter((group) => (totals.get(group) || 0) > 0).map((group) => ({
+      name: group === "UNKNOWN" ? "Unknown" : `${ageBandLabel(group)} years`,
       value: totals.get(group) || 0,
     }))
   }, [charts.farmersByAgeAndGender])
@@ -185,10 +187,10 @@ export function FarmerOverviewDashboard({
     () =>
       (charts.landTenureSplit || [])
         .map((row: any) => ({
-          name: String(row.ownership_type || "Unknown"),
+          name: tenureLabel(row.ownership_type),
           value: toNumber(row.parcels),
           area: toNumber(row.area),
-          color: TENURE_COLORS[row.ownership_type] || REGISTRY_COLORS.indigo,
+          color: TENURE_COLORS[tenureLabel(row.ownership_type)] || REGISTRY_COLORS.indigo,
         }))
         .filter((segment: { value: number }) => segment.value > 0),
     [charts.landTenureSplit]
@@ -207,10 +209,12 @@ export function FarmerOverviewDashboard({
     return { approved, rejected, open }
   }, [charts.farmersByRecordState])
 
-  const coverage = charts.registryCoverage?.[0] || null
-  const woredasTotal = toNumber(coverage?.woredas_total)
-  const woredasCovered = toNumber(coverage?.woredas_covered)
-  const woredaCoverage = woredasTotal > 0 ? (woredasCovered / woredasTotal) * 100 : 0
+  const woredaUnits = useWoredaUnits()
+  const { total: woredasTotal, covered: woredasCovered } = useMemo(
+    () => woredaCoverage(woredaUnits, filters, charts.farmersByWoreda),
+    [woredaUnits, filters, charts.farmersByWoreda]
+  )
+  const coveragePercent = woredasTotal > 0 ? (woredasCovered / woredasTotal) * 100 : 0
 
   const psnpUsers = useMemo(
     () =>
@@ -242,7 +246,7 @@ export function FarmerOverviewDashboard({
   const youthFarmers = useMemo(
     () =>
       (charts.farmersByAgeAndGender || [])
-        .filter((row: any) => String(row.age_group) === "18-30")
+        .filter((row: any) => String(row.age_group) === "UNDER_25")
         .reduce((acc: number, row: any) => acc + toNumber(row.farmers), 0),
     [charts.farmersByAgeAndGender]
   )
@@ -250,7 +254,7 @@ export function FarmerOverviewDashboard({
   const elderlyFarmers = useMemo(
     () =>
       (charts.farmersByAgeAndGender || [])
-        .filter((row: any) => String(row.age_group) === "70+")
+        .filter((row: any) => String(row.age_group) === "65_PLUS")
         .reduce((acc: number, row: any) => acc + toNumber(row.farmers), 0),
     [charts.farmersByAgeAndGender]
   )
@@ -463,7 +467,7 @@ export function FarmerOverviewDashboard({
             icon={<Users className="h-3.5 w-3.5" />}
             iconBg={BRIGHT_SOFT.blue}
             iconColor={BRIGHT.blue}
-            label="Youth farmers (18–30)"
+            label="Youth farmers (under 25)"
             value={formatFull(youthFarmers)}
             share={`(${share(youthFarmers).toFixed(1)}%)`}
           />
@@ -471,7 +475,7 @@ export function FarmerOverviewDashboard({
             icon={<Leaf className="h-3.5 w-3.5" />}
             iconBg={BRIGHT_SOFT.teal}
             iconColor={BRIGHT.teal}
-            label="Farmers aged 70+"
+            label="Farmers aged 65+"
             value={formatFull(elderlyFarmers)}
             share={`(${share(elderlyFarmers).toFixed(1)}%)`}
           />
@@ -509,7 +513,7 @@ export function FarmerOverviewDashboard({
             />
             <ProgressRow
               icon={<Users className="h-3 w-3" />}
-              label="Youth farmers (18–30)"
+              label="Youth farmers (under 25)"
               value={`${share(youthFarmers).toFixed(0)}%`}
               percent={share(youthFarmers)}
               color={BRIGHT.tealSoft}
@@ -523,7 +527,7 @@ export function FarmerOverviewDashboard({
             />
             <ProgressRow
               icon={<Leaf className="h-3 w-3" />}
-              label="Farmers aged 70+"
+              label="Farmers aged 65+"
               value={`${share(elderlyFarmers).toFixed(0)}%`}
               percent={share(elderlyFarmers)}
               color={BRIGHT.amber}
@@ -560,7 +564,7 @@ export function FarmerOverviewDashboard({
                     color: BRIGHT.red,
                   },
                 ]}
-                centerValue={`${woredaCoverage.toFixed(1)}%`}
+                centerValue={`${coveragePercent.toFixed(1)}%`}
                 centerLabel="Coverage"
                 totalLabel="Woredas"
                 totalValue={formatFull(woredasTotal)}

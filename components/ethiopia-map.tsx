@@ -286,6 +286,10 @@ const getViewBox = (features: GeoJSONFeature[]) => {
 /** Flat choropleth ramp shared with the registry legend. */
 const REGISTRY_RAMP = ['#F0FDF4', '#BBF7D0', '#4ADE80', '#16A34A', '#15803D'];
 
+/** Canonical form of an administrative P-code for matching (upper case, alphanumerics only). */
+const normalizeCode = (value: unknown): string =>
+  value ? String(value).toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
+
 export function EthiopiaMap(props: EthiopiaMapProps) {
   const {
     onFilterChange,
@@ -329,57 +333,30 @@ export function EthiopiaMap(props: EthiopiaMapProps) {
   const [showStaticLabels, setShowStaticLabels] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
 
-  // Build a code -> count map with variants to match topo codes
+  // Build a code -> count map. Chart rows carry administrative P-codes
+  // (ET04, ET0410, ET041016), the same codes the boundary features use, so
+  // units are matched exactly: fuzzy variants (suffixes, stripped prefixes)
+  // let one unit's count land on another.
   const codeToCount = useMemo(() => {
-    const normalize = (value: any) => (value ? String(value).toUpperCase().replace(/[^A-Z0-9]/g, '') : '');
     const map = new Map<string, number>();
     const source = mapLevel.type === 'regions' ? farmerData : childData;
     source?.forEach((item: any) => {
-      const raw = item.code || item.region_code || item.zone_code || item.woreda_code || item.kebele_code;
-      const code = normalize(raw);
-      const farmers = parseInt(item.farmers || 0, 10);
+      const code = normalizeCode(item.code || item.region_code || item.zone_code || item.woreda_code || item.kebele_code);
       if (!code) return;
-      const variants = new Set<string>();
-      variants.add(code);
-      variants.add(code.replace(/^ET/, ''));
-      variants.add(code.replace(/^ET0*/, ''));
-      variants.add(code.replace(/^0+/, ''));
-      if (code.length > 6) variants.add(code.slice(-6));
-      if (code.length > 5) variants.add(code.slice(-5));
-      variants.forEach(v => {
-        const existing = map.get(v);
-        map.set(v, existing !== undefined ? Math.max(existing, farmers) : farmers);
-      });
+      map.set(code, (map.get(code) ?? 0) + parseInt(item.farmers || 0, 10));
     });
     return map;
   }, [childData, farmerData, mapLevel.type]);
 
-  // Helper function to get farmer count for a specific region/zone/woreda
+  // Farmer count for a region/zone/woreda feature
   const getFarmerCount = useCallback((feature: GeoJSONFeature | null | undefined): number => {
     if (!feature) return 0;
-    const normalize = (value: any) => (value ? String(value).toUpperCase().replace(/[^A-Z0-9]/g, '') : '');
-
-    const featureCode = normalize(
+    const featureCode = normalizeCode(
       feature.properties.admin3Pcod ||
       feature.properties.admin2Pcod ||
       feature.properties.admin1Pcod
     );
-    if (!featureCode) return 0;
-
-    const variants = [
-      featureCode,
-      featureCode.replace(/^ET/, ''),
-      featureCode.replace(/^ET0*/, ''),
-      featureCode.replace(/^0+/, ''),
-      featureCode.length > 6 ? featureCode.slice(-6) : '',
-      featureCode.length > 5 ? featureCode.slice(-5) : '',
-    ].filter(Boolean);
-
-    for (const key of variants) {
-      const val = codeToCount.get(key);
-      if (typeof val === 'number') return val;
-    }
-    return 0;
+    return featureCode ? codeToCount.get(featureCode) ?? 0 : 0;
   }, [codeToCount]);
 
   const captureMap = async () => {
@@ -493,6 +470,11 @@ export function EthiopiaMap(props: EthiopiaMapProps) {
         }
         if (currentFilters.farmingType && currentFilters.farmingType !== 'all') {
           params.append('farmingType', currentFilters.farmingType);
+        }
+        // Same record-status scope as the dashboard panels, so the map and the
+        // KPIs count the same farmers.
+        if (currentFilters.recordState && currentFilters.recordState !== 'all') {
+          params.append('recordState', currentFilters.recordState);
         }
         if (currentFilters.farmerType && currentFilters.farmerType !== 'all') {
           params.append('farmerType', currentFilters.farmerType);

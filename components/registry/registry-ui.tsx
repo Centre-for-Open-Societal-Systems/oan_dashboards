@@ -754,7 +754,7 @@ export function MiniColumnBars({
   items,
   color = BRIGHT.teal,
 }: {
-  items: Array<{ name: string; percent: number }>
+  items: Array<{ name: string; percent: number; id?: string }>
   color?: string
 }) {
   const max = items.reduce((acc, item) => Math.max(acc, item.percent), 0) || 100
@@ -762,7 +762,7 @@ export function MiniColumnBars({
   return (
     <div className="flex min-h-0 flex-1 items-end gap-1.5">
       {items.map((item) => (
-        <div key={item.name} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+        <div key={item.id || item.name} className="flex min-w-0 flex-1 flex-col items-center gap-1">
           <span className="text-[9px] font-semibold" style={{ color: REGISTRY_COLORS.ink2 }}>
             {item.percent.toFixed(0)}%
           </span>
