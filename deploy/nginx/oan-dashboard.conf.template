@@ -1,0 +1,52 @@
+# Host nginx site for the public dashboards hostname, the same shape as the
+# other *.oanstaging.com sites on the box. TLS terminates here; traffic goes
+# to the Istio ingress gateway (upstream istio_ingress, defined in
+# openg2p-infra.conf), which routes on Host to the release in `commons`.
+#
+# Render for an environment and install (see docs/deployment.md "Public hostname"):
+#   HOST=oan-dashboard-development.oanstaging.com    # staging: oan-dashboard.oanstaging.com
+#   sed "s/__HOST__/$HOST/g" deploy/nginx/oan-dashboard.conf.template \
+#     | sudo tee /etc/nginx/sites-available/openg2p-public-oan-dashboard.conf
+#
+# The 443 server needs the certificate, so install the port-80 part first,
+# issue the certificate with certbot (webroot /var/www/acme), then enable the
+# full file.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __HOST__;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/acme;
+        try_files $uri =404;
+    }
+    location / { return 301 https://$host$request_uri; }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name __HOST__;
+
+    ssl_certificate     /etc/letsencrypt/live/__HOST__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__HOST__/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+
+    location / {
+        proxy_pass                      http://istio_ingress;
+        proxy_http_version              1.1;
+        proxy_buffering                 on;
+        proxy_buffers                   8 16k;
+        proxy_buffer_size               16k;
+        proxy_busy_buffers_size         32k;
+        proxy_set_header                Upgrade $http_upgrade;
+        proxy_set_header                Connection "upgrade";
+        proxy_set_header                Host $host;
+        proxy_set_header                X-Real-IP $remote_addr;
+        proxy_set_header                X-Forwarded-Host $host;
+        proxy_set_header                X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header                X-Forwarded-Proto https;
+        proxy_pass_request_headers      on;
+    }
+}

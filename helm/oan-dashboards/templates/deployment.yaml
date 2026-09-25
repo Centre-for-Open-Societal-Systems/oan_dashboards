@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "oan-dashboards.fullname" . }}
+  labels:
+    {{- include "oan-dashboards.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      {{- include "oan-dashboards.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "oan-dashboards.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "oan-dashboards.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      {{- $pullSecrets := .Values.imagePullSecrets }}
+      {{- if .Values.ecrPullSecret.enabled }}
+      {{- $pullSecrets = prepend $pullSecrets (dict "name" .Values.ecrPullSecret.name) }}
+      {{- end }}
+      {{- with $pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000   # the image's "node" user
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: oan-dashboards
+          image: "{{ required "image.repository is required" .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            {{- range $name, $url := .Values.dashboardServices }}
+            - name: {{ $name }}
+              value: {{ tpl (toString $url) $ | quote }}
+            {{- end }}
+            - name: DASHBOARD_CACHE_TTL_SECONDS
+              value: {{ .Values.cacheTtlSeconds | quote }}
+            {{- range $name, $value := .Values.env }}
+            - name: {{ $name }}
+              value: {{ tpl (toString $value) $ | quote }}
+            {{- end }}
+          {{- with .Values.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          # Next.js writes its runtime cache under .next/cache; everything else
+          # in the image is read-only.
+          volumeMounts:
+            - name: next-cache
+              mountPath: /app/.next/cache
+            - name: tmp
+              mountPath: /tmp
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: next-cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

@@ -4,7 +4,19 @@ node_modules
 npm-debug.log
 yarn-error.log
 coverage
-.env.local
-.env.*.local
 *.log
 tsconfig.tsbuildinfo
+
+# Local configuration and secrets never enter an image. Configuration is
+# supplied at runtime (see docs/configuration.md).
+.env
+.env.*
+!.env.example
+
+# Not needed to build or run the app.
+docs
+helm
+Jenkinsfile
+data
+scripts
+migrations

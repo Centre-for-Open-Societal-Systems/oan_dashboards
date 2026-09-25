@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Self-contained server for the container image (see Dockerfile).
+  output: "standalone",
   compress: true, // Enable gzip compression
   poweredByHeader: false, // Remove X-Powered-By header for security
   async headers() {

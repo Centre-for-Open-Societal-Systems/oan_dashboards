@@ -60,15 +60,21 @@ npm run lint
 npx tsc --noEmit
 ```
 
-- Introduce no new lint or type errors. The known type errors are in `components/ui/calendar.tsx`
-  and `components/ui/resizable.tsx`.
+- Introduce no lint errors, and keep `npx tsc --noEmit` at 0 errors.
 - For data changes, check `/api/charts?charts=<ids>` with no filters and with a region filter:
   `summary.failed` must be 0.
 - Update `docs/` when behaviour, configuration, a service or a chart contract changes.
 
 ## Conventions
 
-- npm is the package manager (`package-lock.json`). The runtime image uses Bun, and `bun.lock` must
-  stay consistent when dependencies change.
+- npm is the package manager. Commit `package-lock.json` with any dependency change: the image
+  installs with `npm ci`.
+- `next build` type-checks, and CI builds the image, so **any type error fails the pipeline**.
+  `npx tsc --noEmit` must report 0 errors.
+- The image is a Next.js standalone server (`output: "standalone"`) running as a non-root user on a
+  read-only root filesystem. Write only to `.next/cache` or `/tmp`.
+- Deployment: `Jenkinsfile`, `helm/oan-dashboards` (namespace `commons`; the release owns its ECR pull
+  secret), `deploy/` (the one-time deploy permission and the nginx template). Everything else goes
+  through the pipeline: never apply cluster objects by hand. See docs/deployment.md.
 - Conventional Commits (`feat(registry): …`, `fix: …`, `docs: …`).
 - Never commit `.env` files or one-off patch or replace scripts. Edit the source directly.

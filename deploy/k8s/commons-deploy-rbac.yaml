@@ -1,0 +1,56 @@
+# Let far:farmer-ci deploy the OAN dashboards into `commons`. Apply once per
+# cluster (dev and staging), as the CLUSTER ADMIN, before the first deploy:
+#
+#   sudo KUBECONFIG=/etc/rancher/rke2/rke2.yaml kubectl apply -f deploy/k8s/commons-deploy-rbac.yaml
+#
+# This is the only object the pipeline cannot create itself: farmer-ci cannot
+# grant itself rights. Everything else (the ECR pull secret and its refresher,
+# the Gateway and VirtualService) belongs to the Helm release.
+#
+# The same grants farmer-ci has in `far` and `crop` (farmer-registry
+# ci/k8s/farmer-deploy-rbac.yaml): the built-in admin role in this one
+# namespace, plus Istio objects, which admin does not cover. Jenkins keeps
+# using the farmer-ci kubeconfigs it already has (gen2-dev-kubeconfig,
+# staging-farmer-kubeconfig).
+#
+# Check:
+#   kubectl auth can-i create deployments -n commons --as=system:serviceaccount:far:farmer-ci   # yes
+#   kubectl auth can-i create gateways.networking.istio.io -n commons --as=system:serviceaccount:far:farmer-ci   # yes
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: farmer-ci-admin
+  namespace: commons
+subjects:
+  - kind: ServiceAccount
+    name: farmer-ci
+    namespace: far
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: admin
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ci-deploy-istio
+  namespace: commons
+rules:
+  - apiGroups: ["networking.istio.io", "security.istio.io"]
+    resources: ["*"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: farmer-ci-istio
+  namespace: commons
+subjects:
+  - kind: ServiceAccount
+    name: farmer-ci
+    namespace: far
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ci-deploy-istio

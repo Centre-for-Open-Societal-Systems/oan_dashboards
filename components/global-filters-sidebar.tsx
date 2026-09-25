@@ -30,6 +30,13 @@ interface FarmerType { farmer_type: string; count: number; }
 
 export type DashboardType = "registries" | "catalogs" | "a2c" | "devops"
 
+const DASHBOARD_OPTIONS: { value: DashboardType; label: string }[] = [
+  { value: "registries", label: "Registries" },
+  { value: "catalogs", label: "Catalogs" },
+  { value: "a2c", label: "A2C - Access to Credit" },
+  { value: "devops", label: "DevOps" },
+]
+
 interface GlobalFiltersSidebarProps {
   filters: {
     region: string
@@ -45,6 +52,8 @@ interface GlobalFiltersSidebarProps {
   onSidebarToggle: () => void
   dashboardType: DashboardType
   onDashboardTypeChange: (value: DashboardType) => void
+  /** Dashboards this deployment serves (GET /api/config). Defaults to all. */
+  availableDashboards?: DashboardType[]
   a2cFilters: A2CFilters
   onA2CFiltersChange: (filters: A2CFilters) => void
 }
@@ -58,6 +67,8 @@ export function GlobalFiltersSidebar({
   dashboardType,
 
   onDashboardTypeChange,
+
+  availableDashboards = ["registries", "catalogs", "a2c", "devops"],
 
   a2cFilters,
 
@@ -464,10 +475,9 @@ export function GlobalFiltersSidebar({
             <SelectValue placeholder="Select dashboard" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="registries">Registries</SelectItem>
-            <SelectItem value="catalogs">Catalogs</SelectItem>
-            <SelectItem value="a2c">A2C - Access to Credit</SelectItem>
-            <SelectItem value="devops">DevOps</SelectItem>
+            {DASHBOARD_OPTIONS.filter((option) => availableDashboards.includes(option.value)).map((option) => (
+              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>

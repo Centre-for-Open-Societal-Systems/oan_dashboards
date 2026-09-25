@@ -1,0 +1,6 @@
+apiVersion: v2
+name: oan-dashboards
+description: OAN Dashboards web application and backend-for-frontend.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

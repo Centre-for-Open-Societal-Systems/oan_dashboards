@@ -33,6 +33,9 @@ Each group below moves to its registry's dashboard service as that service becom
 
 ## Filters
 
+The filter options themselves (units, record statuses) come from the map boundaries and the farmer
+registry dashboard service; see [Architecture](architecture.md#filter-options).
+
 The UI sends filters as query parameters on `/api/charts`:
 
 | Parameter | Set by | Meaning |
