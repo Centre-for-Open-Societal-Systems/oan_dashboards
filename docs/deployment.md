@@ -215,7 +215,7 @@ ingress. For a new hostname:
 - **Load on the dashboard services:** each replica keeps its own service cache. With *N* replicas,
   each service gets at most *N* calls per chart and filter combination per cache period, plus the
   periodic warm-up of its unfiltered charts. Load does not grow with the number of viewers.
-- **Memory:** the map boundaries are decoded per request. The 768Mi limit leaves headroom for that.
+- **Map boundaries:** served as stored (Brotli TopoJSON, about 1 MB for all three levels), held in memory once per process, and cached by browsers for a day. They cost no per-request CPU.
 
 ## Monitoring
 
