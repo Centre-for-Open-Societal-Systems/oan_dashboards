@@ -414,15 +414,17 @@ export function EthiopiaMap(props: EthiopiaMapProps) {
           return res.json();
         };
 
-        const [regions, zones, woredas] = await Promise.all([
-          fetchGeoJson('regions'),
-          fetchGeoJson('zones'),
-          fetchGeoJson('woredas'),
-        ]);
-
-        setRegionsData(topoToGeo(regions));
-        setZonesData(topoToGeo(zones));
-        setWoredasData(topoToGeo(woredas));
+        // Regions are drawn as soon as they arrive (32 KB); the drill-down
+        // levels (zones 199 KB, woredas 747 KB) load in the background.
+        const zones = fetchGeoJson('zones');
+        const woredas = fetchGeoJson('woredas');
+        // Awaited below; this only stops an unhandled rejection if regions fail first.
+        zones.catch(() => {});
+        woredas.catch(() => {});
+        setRegionsData(topoToGeo(await fetchGeoJson('regions')));
+        setLoading(false);
+        setZonesData(topoToGeo(await zones));
+        setWoredasData(topoToGeo(await woredas));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load map data');
       } finally {

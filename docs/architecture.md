@@ -56,7 +56,7 @@ flowchart TB
 | BFF | `server/elysia-app.ts`, mounted by `app/api/[[...slugs]]/route.ts` | Parses filters, routes each chart ID, merges batch results |
 | Service map and cache | `server/dashboard-services.ts` | `DASHBOARD_SERVICES`: service id, URL variable, accepted filters and chart IDs for each service. Shared response cache |
 | Warm-up | `instrumentation.ts` | Pre-loads the unfiltered charts of every configured service at start-up and every cache period |
-| Map geometry | `app/api/maps/[level]/route.ts` | Serves region, zone and woreda boundaries (Brotli TopoJSON in `public/maps`) as GeoJSON |
+| Map geometry | `app/api/maps/[level]/route.ts` | Serves region, zone and woreda boundaries: the Brotli TopoJSON files in `public/maps`, sent as stored (`Content-Encoding: br`, gzip for clients without Brotli), with an ETag and a one-day cache. The map converts them to GeoJSON in the browser, drawing regions first and loading zones and woredas in the background. Never convert them on the server: as GeoJSON the woredas are ~32 MB |
 | Boundary units | `app/api/maps/units/route.ts` | Every woreda in the boundaries with its zone and region P-codes (no geometry). The denominator for geographic coverage |
 | Registry dashboard services | separate repositories | Read-only aggregate APIs, one per registry |
 
