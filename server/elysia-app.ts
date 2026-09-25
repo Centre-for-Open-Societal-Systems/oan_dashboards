@@ -6,7 +6,7 @@ import { validateFilters, ChartFilters as ServiceChartFilters } from '@/lib/char
 import { CHART_QUERIES, ChartFilters } from '@/lib/chart-queries'
 import { pool, farmerPool } from '@/lib/database'
 import type { Context } from 'elysia'
-import { generateCacheKey, getCachedData, setCachedData } from './cache'
+import { getRegistryChart, isRegistryChart } from './registry-cache'
 
 const filterColumnMap = {
   region: { name: 'rp.region', type: 'integer' },
@@ -71,6 +71,12 @@ function buildWhereClause(filters: ChartFilters, overrides?: FilterOverrides, us
     clause: `AND ${conditions.join(' AND ')}`,
     values,
   }
+}
+
+// P-code → g2p id conversion only matters for local SQL charts; skip the
+// lookups for a batch that is served entirely by the dashboard API.
+async function convertFiltersFor(chartNames: string[], filters: any) {
+  return chartNames.every(isRegistryChart) ? filters : convertPcodsToIds(filters)
 }
 
 async function convertPcodsToIds(filters: any) {
@@ -210,26 +216,12 @@ async function executeChartQuery(chartName: string, filters: ChartFilters, conve
   let result: any
 
   try {
-    const pythonEndpoints = [
-        'farmerKpis', 'farmersByRegion', 'farmersByGender', 'farmersByType',
-        'farmersByAgeAndGender', 'farmersByEducation', 'landTenureSplit',
-        'registryTrendByMonth', 'registryCoverage', 'farmersByRecordState',
-        'farmersByImportStatus', 'farmersByPsnpStatus'
-    ]
-    if (pythonEndpoints.includes(chartName)) {
-      const qs = new URLSearchParams(Object.entries(filters).filter(([_,v])=>v!=='all')).toString()
-      const baseUrl = process.env.NEXT_PUBLIC_FARMER_API_BASE || 'http://localhost:8005'
-      const url = `${baseUrl}/api/v1/charts/${chartName}?${qs}`
-      const res = await fetch(url)
-      
-      if (res.ok) {
-        const rows = await res.json()
-        const executionTime = Math.round(performance.now() - startTime)
-        result = { chartName, success: true, data: rows, error: null, executionTime }
-        return result
-      } else {
-         throw new Error('Python API returned ' + res.status)
-      }
+    // GEN2 registry charts come from farmer-registry-dashboard-api, through a
+    // 15-minute cache (server/registry-cache.ts).
+    if (isRegistryChart(chartName)) {
+      const rows = await getRegistryChart(chartName, filters)
+      const executionTime = Math.round(performance.now() - startTime)
+      return { chartName, success: true, data: rows, error: null, executionTime }
     }
 
     const baseQuery = CHART_QUERIES[chartName as keyof typeof CHART_QUERIES]
@@ -280,7 +272,7 @@ function parseChartFilters(query: Context['query']): ChartFilters {
 }
 
 async function runChartGroup(chartNames: string[], filters: ChartFilters) {
-  const convertedFilters = await convertPcodsToIds(filters)
+  const convertedFilters = await convertFiltersFor(chartNames, filters)
   const resultsArray = await Promise.all(chartNames.map(chartId => executeChartQuery(chartId, filters, convertedFilters)))
 
   const data: Record<string, any[]> = {}
@@ -642,7 +634,7 @@ export function createElysiaApp(prefix = '/api') {
       const requestedCharts = (query.charts as string | undefined)?.split(',').filter(Boolean)
       const targetCharts = requestedCharts && requestedCharts.length > 0 ? requestedCharts : Object.keys(CHART_QUERIES)
 
-      const convertedFilters = await convertPcodsToIds(filters as any)
+      const convertedFilters = await convertFiltersFor(targetCharts, filters)
       const resultsArray = await Promise.all(targetCharts.map(chartId => executeChartQuery(chartId, filters as any, convertedFilters)))
 
       const results: Record<string, any> = {}
@@ -692,7 +684,7 @@ export function createElysiaApp(prefix = '/api') {
           farmerType: (query.farmerType as string) || 'all',
           provider: (query.provider as string) || 'all',
         }
-        const result = await executeChartQuery(chartName, filters)
+        const result = await executeChartQuery(chartName, filters, await convertFiltersFor([chartName], filters))
         if (!result.success) set.status = 500
         return result
       } catch (error: any) {
