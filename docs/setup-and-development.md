@@ -1,90 +1,98 @@
-# Setup and Development
-
-This guide outlines how to set up the `oan_dashboards` local development environment, including connecting to the local mock database and the live Gen2 farmer registry database.
+# Setup and development
 
 ## Prerequisites
 
-- **Node.js** (v20+ recommended)
-- **npm** (or Bun/Yarn)
-- **Docker & Docker Compose** (for running the Gen2 stack and Postgres)
+- Node.js 20 or later, and npm
+- Docker, to run the registry dashboard services locally
+- Access to the registries whose dashboards you work on. Each dashboard service needs its registry's
+  database with reporting views (for the farmer registry, its Docker Compose stack)
 
-## 1. Environment Configuration
-
-Copy the example environment file to `.env`:
+## 1. Configure
 
 ```bash
 cp .env.example .env
 ```
 
-Ensure your `.env` contains the proper secure connection strings. By default, the Gen2 Docker stack exposes PostgreSQL on port `5432`. We will use this single database instance to host both the Gen2 data and our local mock data.
+Set the URL of each dashboard service you run, for example
+`FARMER_REGISTRY_DASHBOARD_API_URL=http://localhost:8005`. `.env` is git-ignored: keep real values
+there, and never in `.env.example`. See [Configuration](configuration.md).
 
-```ini
-# .env
+## 2. Run the dashboard services
 
-# Connection to the local mock database (Catalogs, A2C, DevOps)
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/ati_fp_dashboard
-
-# Connection to the Gen2 live database (Registries)
-FARMER_DATABASE_URL=postgres://postgres:postgres@localhost:5432/farmer_registry_db
-```
-
-## 2. Start the Gen2 Database Stack
-
-The dashboard requires the `farmer-registry-coss-v3` backend to be running to fetch live farmer data. Navigate to that repository and start the stack:
+Each registry's dashboard service runs from its own repository. For the farmer registry:
 
 ```bash
-cd ../farmer-registry-coss-v3
-docker compose up -d
+# in farmer-registry-dashboard-api
+cp .env.example .env        # DATABASE_URL for the registry database (read-only role)
+docker compose up -d --build
+curl http://localhost:8005/health
 ```
 
-This ensures `farmer_registry_db` is available on `localhost:5432`.
+A service you do not run only affects its own charts. They show an error and a warning is logged.
 
-## 3. Setup the Local Database
-
-Return to the `oan_dashboards` directory and install the dependencies:
+## 3. Run the dashboards
 
 ```bash
 npm install
+npm run dev                 # http://localhost:3000
 ```
 
-Next, create the `ati_fp_dashboard` database and run the synthetic data seed scripts. These scripts connect to `localhost:5432` using your `DATABASE_URL` credentials.
+At start-up the server warms the service cache. Services that are unreachable or not configured are
+reported as `[dashboard-services] …` warnings.
+
+Tips for development:
+
+- Set `DASHBOARD_CACHE_TTL_SECONDS=60` to see registry changes sooner.
+- Restarting `npm run dev` clears the cache.
+- Check a batch without the UI:
+  `curl "localhost:3000/api/charts?charts=farmerKpis,farmersByGender" | jq .summary`.
+  An `executionTime` of about 0 ms means the chart was served from the cache.
+
+## Transitional dashboard database
+
+The Catalogs, Access to Credit and DevOps dashboards (and some Registries panels) still read a
+PostgreSQL database directly, until their dashboard services exist. To work on them locally:
+
+1. Create a local database and set `DATABASE_URL` in your `.env`.
+2. Load the sample data with the scripts in `scripts/`:
+   - `npm run db:setup` / `db:seed` for the application tables
+   - `db:catalog`, `db:a2c` and `db:devops` for the domain tables
+
+   The scripts read their connection settings (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`,
+   `DB_NAME`) from your shell environment or your uncommitted `.env`. Use local development
+   credentials only.
+
+Do not extend this path. New registry data goes through a dashboard service
+([Data integration](data-integration.md)).
+
+## Checks
 
 ```bash
-# Creates the ati_fp_dashboard database inside the running Postgres container
-docker exec farmer-registry-postgres psql -U postgres -c "CREATE DATABASE ati_fp_dashboard;"
-
-# Seed the geographic layouts and local Odoo-mock schema
-npm run db:seed
-
-# Load the catalog, A2C, and DevOps mock data
-npm run db:catalog
-npm run db:a2c
-npm run db:devops
+npm run lint            # ESLint
+npx tsc --noEmit        # type-check
+npm run build           # production build
 ```
 
-## 4. Run the Development Server
+There is no automated UI test suite yet. Before submitting a change that affects data, open each
+dashboard you touched and try:
 
-Start the Next.js frontend:
+- no filters
+- a region
+- a region and a zone
+- farming type *Crop* and *Livestock*
 
-```bash
-npm run dev
+Confirm that `/api/charts` reports `failed: 0` for the charts involved.
+
+## Project layout
+
 ```
-
-The unified dashboard will now be available at `http://localhost:3000`. 
-- Navigate to the **Registries** page to view live Gen2 farmer data.
-- Navigate to **Catalogs** or **Access to Credit** to view the local synthetic data.
-
-## 5. Building for Production
-
-To build an optimized production bundle:
-
-```bash
-npm run build
-npm start
-```
-
-Alternatively, you can use the provided `Dockerfile` to containerize the dashboard:
-```bash
-docker build -t oan-dashboards .
-docker run -p 3000:3000 --env-file .env oan-dashboards
+app/                    Next.js app router: page, layout, API route handlers
+components/             dashboards, registry UI kit, map, shadcn/ui primitives
+hooks/                  data-fetching hooks
+lib/                    transitional SQL catalogue, database pools, formatting
+server/                 Elysia BFF, dashboard service map and cache
+instrumentation.ts      server start-up hook (service cache warm-up)
+data/, scripts/         sample data and loaders for the transitional database
+public/maps/            Brotli-compressed TopoJSON boundaries
+docs/                   documentation
 ```

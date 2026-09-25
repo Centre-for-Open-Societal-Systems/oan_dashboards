@@ -4,7 +4,8 @@ The Registries dashboard presents live statistics from the OpenG2P farmer regist
 covers:
 
 - where the figures come from
-- the contract between the dashboard and the Farmer Registry Dashboard API
+- the contract between the dashboard and the farmer registry's dashboard service
+  ([farmer-registry-dashboard-api](https://github.com/Centre-for-Open-Societal-Systems/farmer-registry-dashboard-api))
 - caching and freshness
 - known limitations
 
@@ -13,8 +14,8 @@ covers:
 ```mermaid
 flowchart LR
     UI[Registry dashboard components] -->|/api/charts| BFF[BFF]
-    BFF --> Cache[Registry cache<br/>15 min]
-    Cache -->|miss or expiry| API[Farmer Registry Dashboard API]
+    BFF --> Cache[Service cache<br/>15 min]
+    Cache -->|miss or expiry| API[Farmer registry<br/>dashboard service]
     API --> F[(fr_rpt_farmer<br/>one row per farmer)]
     API --> L[(fr_rpt_land<br/>one row per parcel)]
     R[(Registry tables)] -. scheduled refresh .-> F
@@ -29,7 +30,7 @@ flowchart LR
 
   Both unpack geography by position, so they are the same for any country, and both report areas in
   hectares.
-- **Dashboard API.** A read-only service computes each chart as one parameterised aggregate query
+- **Dashboard service.** The farmer registry's read-only dashboard service computes each chart as one parameterised aggregate query
   over those views. Its full contract is documented in its own repository, in
   `docs/api-reference.md`.
 - **BFF cache.** The dashboards cache each chart and filter combination, as described below.
@@ -47,14 +48,14 @@ flowchart LR
 | `farmersByRecordState` | Record status indicators | `record_state, farmers` | Covers every status |
 | `landTenureSplit` | Land tenure (overview, crop, livestock) | `ownership_type, parcels, area` | Per parcel. Codes: `OWNER`, `TENANT`, `CROP_SHARE`, labelled in the UI |
 | `registryTrendByMonth` | Registrations per month, registered vs owned area | `period (YYYY-MM), farmers, total_area, owned_area` | |
-| `registryCoverage` | Geographic coverage | `{regions,zones,woredas,kebeles}_{covered,total}` | Totals are API configuration. `null` means unknown, and the UI then shows 0% |
+| `registryCoverage` | Geographic coverage | `{regions,zones,woredas,kebeles}_{covered,total}` | Totals are service configuration. `null` means unknown, and the UI then shows 0% |
 | `farmersByPsnpStatus`, `farmersByImportStatus` | Indicator tiles | always `[]` | No registry equivalent yet |
 
-The list of chart IDs served by the API is `REGISTRY_CHARTS` in `server/registry-cache.ts`.
+These chart IDs are declared for the `farmer-registry` entry of `DASHBOARD_SERVICES` in `server/dashboard-services.ts`.
 
 ### Codes and labels
 
-The API returns registry **codes**. Labels are applied in one place,
+The service returns registry **codes**. Labels are applied in one place,
 `components/registry/registry-data.ts`:
 
 - `AGE_BANDS` and `ageBandLabel()` for age bands, for example `UNDER_25` → "Under 25"
@@ -64,7 +65,7 @@ Components must not re-bucket codes. If the registry changes its bands, only the
 
 ## Filters
 
-The sidebar filters map to API parameters as follows:
+The sidebar filters map to service parameters as follows:
 
 | Sidebar | Parameter | Behaviour |
 | --- | --- | --- |
@@ -78,7 +79,7 @@ The sidebar filters map to API parameters as follows:
 | Layer | Default | Effect |
 | --- | --- | --- |
 | Registry view refresh | hourly (registry setting) | Figures reflect the register as of the last refresh |
-| BFF registry cache | 15 minutes (`REGISTRY_CACHE_TTL_SECONDS`) | Each chart and filter combination is fetched from the API at most once per period for each server process |
+| Dashboards service cache | 15 minutes (`DASHBOARD_CACHE_TTL_SECONDS`) | Each chart and filter combination is fetched from the service at most once per period for each server process |
 
 The worst-case lag between a change in the register and the dashboard is therefore the refresh
 interval plus one cache period (about 75 minutes with the defaults). For a statistical overview this
@@ -89,11 +90,11 @@ Behaviour:
 
 - The unfiltered dashboard is pre-loaded when the server starts and refreshed every period, so it
   always opens from the cache.
-- The first request for a filter combination waits for the API (typically well under a second).
+- The first request for a filter combination waits for the service (typically well under a second).
   Requests after that are served from memory.
 - After a period expires, viewers still get the previous figures instantly while a background
   refresh runs.
-- If the API is unavailable, combinations already in the cache keep showing their last figures. New
+- If the service is unavailable, combinations already in the cache keep showing their last figures. New
   combinations show an error in the affected panels.
 
 To force fresh figures, restart the dashboards server or wait one cache period.
@@ -107,10 +108,10 @@ To force fresh figures, restart the dashboards server or wait one cache period.
   - crop and livestock indicators
   - latest registrations
 
-  They show seeded reference data until they move to the API.
+  They show seeded reference data until they move to the farmer registry dashboard service.
 - **Record status tiles.** The overview counts `approved`, `rejected` and `pending` records, but the
   registry uses a different status vocabulary (for example `ACTIVE`), so those tiles show 0.
 - **Unavailable indicators.** The registry reporting views have no source yet for household heads,
   farmer ID coverage, PSNP participation or legacy-import status.
-- **Coverage percentage.** The percentage needs the national unit counts to be configured in the API
+- **Coverage percentage.** The percentage needs the national unit counts to be configured in the service
   (`GEO_LEVEL_TOTALS`).

@@ -1,50 +1,120 @@
-# Data Integration & Query Routing
+# Data integration
 
-> **Registries (GEN2 farmer registry):** this page describes the older direct-SQL design. The current design (dashboard API, 15-minute cache) is [farmer-registry-dashboard-design.md](farmer-registry-dashboard-design.md).
+This document explains how a chart gets its data:
 
-A core feature of the `oan_dashboards` architecture is its ability to seamlessly multiplex queries across two entirely different database schemas (the legacy Odoo `res_partner` schema and the new OpenG2P Gen2 schema) without exposing the complexity to the frontend.
+- how chart IDs are routed
+- how filters become service parameters or SQL
+- how to add or move a chart
 
-## Dynamic Database Routing
+## Chart IDs
 
-When a chart requests data, the request is intercepted by `server/elysia-app.ts`. The API dynamically decides which database connection pool to use based on the contents of the SQL query string defined in `lib/chart-queries.ts`.
+Every panel asks for its data by **chart ID** (for example `farmerKpis`, `a2cLoanTrend`). A chart ID
+is served in one of two ways:
 
-```typescript
-// server/elysia-app.ts
-const isGen2 = baseQuery.includes('g2p_register_farmers');
-const activePool = isGen2 ? farmerPool : pool;
-const { rows } = await activePool.query(sql, values);
+| Route | Chart IDs | Source |
+| --- | --- | --- |
+| **Dashboard service** (target) | IDs declared in `DASHBOARD_SERVICES` (`server/dashboard-services.ts`) | The owning registry's dashboard service, through the service cache |
+| **Local SQL** (transitional) | every other key of `CHART_QUERIES` (`lib/chart-queries.ts`) | The transitional dashboard database (`DATABASE_URL`) |
+
+`executeChartQuery` (`server/elysia-app.ts`) checks the service map first (`serviceForChart`). Any
+other ID must exist in `CHART_QUERIES`, and an unknown ID returns `success: false`.
+
+### Transitional chart catalogue
+
+Each group below moves to its registry's dashboard service as that service becomes available.
+
+| Group | Chart IDs | Current source |
+| --- | --- | --- |
+| Farmer registry panels not yet on the service | `farmersByZone`, `farmersByWoreda`, `farmersByKebele`, `landStats`, `landAreaByRegion`, `demographyStats`, `socioEconomicKpis`, `recentRegistrations` | `res_partner` and related `g2p_*` tables |
+| Crop and livestock registry panels | `crop*`, `livestock*` | crop and livestock tables |
+| Catalogs | `catalog*` | `crop_catalog`, `crop_variety`, `livestock_*`, `seed_*`, location catalogue |
+| Access to Credit | `a2c*` | `a2c_*` tables, through the `A2C_SCOPE` views |
+| DevOps | `devops*` | `devops_*` tables |
+
+## Filters
+
+The UI sends filters as query parameters on `/api/charts`:
+
+| Parameter | Set by | Meaning |
+| --- | --- | --- |
+| `region`, `zone`, `woreda`, `kebele` | Geography filters, map clicks | Administrative codes, for example `ET04`, `ET0413` |
+| `farmingType` | Farming Type | `crop`, `livestock`, `mixed` |
+| `farmerType` | Type of Farmer | Farmer type label |
+| `recordState` (or `state`) | Record Status | Record status |
+| `provider` | Credit Provider (Access to Credit only) | Provider id |
+
+`all`, or leaving the parameter out, means no filter.
+
+### Dashboard service charts
+
+Each service receives only the filters listed in its `filters` entry, unchanged. For the farmer
+registry these are `region`, `zone`, `woreda`, `kebele`, `farmingType` and `recordState`. Each
+service documents how it applies them; the farmer registry service, for example, counts only active
+records when `recordState` is absent. Filters a service does not accept are not forwarded, so they
+do not split the cache.
+
+### Local SQL charts (transitional)
+
+A SQL template declares which filters it accepts by carrying a placeholder:
+
+| Placeholder | Expanded by | Produces |
+| --- | --- | --- |
+| `--- DYNAMIC_FILTERS ---` | `buildWhereClause` | `AND rp.region = $1::integer AND …`. Geography codes are first converted to the integer ids of the `g2p_region`/`g2p_zone`/`g2p_woreda`/`g2p_kebele` tables (`convertPcodsToIds`). `farmingType` is matched against known aliases |
+| `--- A2C_GEO_FILTERS ---` and `--- A2C_PROVIDER_FILTERS ---` | `buildA2CClauses` | `AND region_pcode = $1 …` and `AND id = $n::integer` |
+| none | — | Filters are ignored (reference data) |
+
+Column names come from fixed maps (`filterColumnMap`, `a2cGeoColumns`, and `chartFilterOverrides`
+for charts that join on a different alias). Values are always bound as `$n` parameters.
+
+## Response format
+
+`GET /api/charts?charts=a,b` returns:
+
+```json
+{
+  "success": true,
+  "data": {
+    "a": { "chartName": "a", "success": true, "data": [ { "...": "..." } ], "error": null, "executionTime": 1 },
+    "b": { "chartName": "b", "success": false, "data": [], "error": "…", "executionTime": 12 }
+  },
+  "summary": { "total": 2, "successful": 1, "failed": 1, "totalExecutionTime": 13 },
+  "filters": { "region": "ET04" },
+  "timestamp": "2026-01-01T00:00:00.000Z"
+}
 ```
 
-- **If the query targets `g2p_register_farmers`**: The engine knows this is a Registries dashboard query and executes it against `FARMER_DATABASE_URL` (`farmer_registry_db`). It also bypasses local ID-to-PCode translation, natively sending standard geographic P-codes (e.g., `ET0410`) to Gen2.
-- **Otherwise**: The engine defaults to the standard `DATABASE_URL` (`ati_fp_dashboard`) and executes queries against the local synthetic data tables (like `crop_catalog` or `res_partner`).
+`useChartGroupData` turns this into `{ data: { a: rows, b: [] }, errors: [...] }` for components.
 
-## Gen2 Schema Translation (`GEN2_SCOPE`)
+`executionTime` shows how a chart was served:
 
-The Gen2 farmer registry database (`farmer_registry_db`) stores geographic locations in a complex JSON hierarchy (`geo_code_hierarchy_json`). However, the legacy dashboard UI expects flat columns (`region`, `zone`, `woreda`) for grouping and filtering.
+- about 0–1 ms from the service cache
+- a few hundred ms for a call to a service
+- the query time for local SQL
 
-To bridge this gap without migrating data, we utilize a PostgreSQL Common Table Expression (CTE) named `GEN2_SCOPE` in `lib/chart-queries.ts`:
+## Adding a chart
 
-```sql
-export const GEN2_SCOPE = `
-  WITH rp AS (
-    SELECT
-      f.internal_record_id,
-      (SELECT elem->>'level_value_id' FROM jsonb_array_elements(f.geo_code_hierarchy_json->'hierarchy') elem WHERE elem->>'level_mnemonic' = 'region' LIMIT 1) AS region,
-      (SELECT elem->>'level_value_id' FROM jsonb_array_elements(f.geo_code_hierarchy_json->'hierarchy') elem WHERE elem->>'level_mnemonic' = 'zone' LIMIT 1) AS zone,
-      (SELECT elem->>'level_value_id' FROM jsonb_array_elements(f.geo_code_hierarchy_json->'hierarchy') elem WHERE elem->>'level_mnemonic' = 'woreda' LIMIT 1) AS woreda,
-      (SELECT elem->>'level_value_id' FROM jsonb_array_elements(f.geo_code_hierarchy_json->'hierarchy') elem WHERE elem->>'level_mnemonic' = 'kebele' LIMIT 1) AS kebele,
-      f.gender,
-      'Mixed Farming' AS farming_type,
-      'yes' AS is_farmer,
-      TRUE AS is_registrant,
-      FALSE AS is_group
-    FROM g2p_register_farmers f
-    WHERE f.record_status = 'ACTIVE'
-  )
-`
-```
+### From a dashboard service (the standard path)
 
-### How it Works
-1. **JSON Extraction**: It unpacks the `geo_code_hierarchy_json` array on the fly, extracting the `level_value_id` (the P-code) for each administrative level.
-2. **Schema Aliasing**: It aliases `g2p_register_farmers f` as `rp` (res_partner) and injects default boolean flags (`is_farmer`, `is_registrant`). It also provides a default `'Mixed Farming'` string since Gen2 abstracts farm profiling away from the core farmer record.
-3. **Seamless Integration**: The subsequent `SELECT` statements (like `farmersByZone`) simply query `FROM rp`. The `--- DYNAMIC_FILTERS ---` placeholder safely injects standard `WHERE` clauses (`AND rp.region = $1`) against these aliased CTE columns.
+1. Implement the chart in the owning registry's dashboard service, with a contract test and API
+   documentation.
+2. Add the chart ID to that service's `charts` in `DASHBOARD_SERVICES`.
+3. Request it from the component with `useChartGroupData([..., 'newChart'], filters)`.
+4. Label registry codes through helpers in `components/registry/registry-data.ts`. Do not re-bucket
+   them.
+
+If the registry has no dashboard service yet, create one (see
+[Dashboard services](dashboard-services.md)) rather than adding SQL here.
+
+### Moving a transitional chart to a service
+
+1. Implement it in the service, returning the keys the component already reads. Values may be
+   registry codes, as long as the component labels them.
+2. Add the chart ID to the service's `charts`.
+3. Delete its entry from `CHART_QUERIES`.
+4. When a dashboard no longer has any local SQL charts, remove its tables and seed data from the
+   transitional database. When none remain, remove `DATABASE_URL`.
+
+### Changing a transitional SQL chart
+
+Only fix what is needed. Never build values into the SQL string, and never take a column name from
+the request.
