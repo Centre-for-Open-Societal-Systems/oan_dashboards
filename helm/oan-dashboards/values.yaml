@@ -5,8 +5,19 @@ image:
   tag: ""          # set by CI: the commit sha (12)
   pullPolicy: IfNotPresent
 
-# Pull secrets for the image. Usually empty: the namespace's default
-# ServiceAccount carries the ECR pull secret (deploy/k8s/oan-bootstrap.yaml).
+# ECR pull secret, created and refreshed by the release (a pre-install/
+# pre-upgrade hook Job, then a CronJob), so the namespace needs no setup and
+# the namespace's default ServiceAccount is left alone. The token comes from
+# the node's IAM role. The pod uses it automatically.
+ecrPullSecret:
+  enabled: true
+  name: oan-dashboards-ecr
+  registry: ""           # default: the host part of image.repository
+  schedule: "0 */8 * * *"
+  awsCliImage: amazon/aws-cli:2.36.43
+  kubectlImage: alpine/k8s:1.31.1
+
+# Further pull secrets for the image, as [{name: ...}].
 imagePullSecrets: []
 
 replicas: 1

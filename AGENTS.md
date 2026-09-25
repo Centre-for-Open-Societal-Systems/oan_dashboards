@@ -73,7 +73,8 @@ npx tsc --noEmit
   `npx tsc --noEmit` must report 0 errors.
 - The image is a Next.js standalone server (`output: "standalone"`) running as a non-root user on a
   read-only root filesystem. Write only to `.next/cache` or `/tmp`.
-- Deployment: `Jenkinsfile`, `helm/oan-dashboards`, `deploy/` (cluster bootstrap and nginx
-  template). See docs/deployment.md.
+- Deployment: `Jenkinsfile`, `helm/oan-dashboards` (namespace `commons`; the release owns its ECR pull
+  secret), `deploy/` (the one-time deploy permission and the nginx template). Everything else goes
+  through the pipeline: never apply cluster objects by hand. See docs/deployment.md.
 - Conventional Commits (`feat(registry): …`, `fix: …`, `docs: …`).
 - Never commit `.env` files or one-off patch or replace scripts. Edit the source directly.

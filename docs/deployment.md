@@ -1,14 +1,18 @@
 # Deployment and operations
 
-The dashboards run in the `oan` namespace of the OpenG2P clusters. Jenkins builds the image, pushes
-it to ECR, and deploys it with the Helm chart in `helm/oan-dashboards`.
+The dashboards run in the shared `commons` namespace of the OpenG2P clusters, next to the platform
+services. Jenkins builds the image, pushes it to ECR, and deploys it with the Helm chart in
+`helm/oan-dashboards`. The release owns everything it needs in the namespace, including its ECR
+pull secret. The only one-time cluster step is the deploy permission
+([Deploy permission](#deploy-permission-once-per-cluster)).
 
 | Environment | Branch | Cluster | Public URL | Jenkins kubeconfig credential |
 | --- | --- | --- | --- | --- |
-| dev | `develop` | gen2 dev (RKE2, API `https://10.0.1.166:6443`) | https://oan-dashboard-development.oanstaging.com | `oan-dev-kubeconfig` |
-| staging | `staging` | staging (`10.0.1.212`) | https://oan-dashboard.oanstaging.com | `oan-staging-kubeconfig` |
+| dev | `develop` | gen2 dev (RKE2, API `https://10.0.1.166:6443`) | https://oan-dashboard-development.oanstaging.com | `gen2-dev-kubeconfig` |
+| staging | `staging` | staging (`10.0.1.212`) | https://oan-dashboard.oanstaging.com | `staging-farmer-kubeconfig` |
 
-Other branches and pull requests build and push the image but do not deploy.
+The kubeconfig credentials are the farmer registry's: both are for the `far:farmer-ci`
+ServiceAccount. Other branches and pull requests build and push the image but do not deploy.
 
 ## Topology
 
@@ -16,7 +20,7 @@ Other branches and pull requests build and push the image but do not deploy.
 flowchart LR
     User -->|HTTPS| Nginx[host nginx :443<br/>TLS, certbot]
     Nginx -->|HTTP, Host header| Istio[Istio ingress gateway<br/>NodePort 30080]
-    Istio -->|Gateway public-oanstaging<br/>VirtualService| Svc[oan/oan-dashboards]
+    Istio -->|Gateway public-oanstaging<br/>VirtualService| Svc[commons/oan-dashboards]
     Svc --> Pod[oan-dashboards pod :3000]
     Pod -->|HTTP| FRS[far/farmer-registry-dashboard-api]
 ```
@@ -51,93 +55,95 @@ the build context. The chart runs the container with a read-only root filesystem
 | `env`, `envFrom` | empty | Extra variables. Supply `DATABASE_URL` from a Secret via `envFrom` to enable the transitional dashboards |
 | `ingress.public` | disabled | `enabled`, `host`, `gatewayName` (default `public-oanstaging`). Creates a Gateway (port 8080, HTTP2, selector `istio: ingressgateway`) and a VirtualService for the host |
 | `ingress.private` | disabled | A VirtualService on an existing private gateway in the namespace |
+| `ecrPullSecret` | enabled, secret `oan-dashboards-ecr` | ECR pull secret owned by the release. `registry` defaults to the host of `image.repository` |
+| `imagePullSecrets` | empty | Further pull secrets |
 | `replicas`, `resources` | 1; 100m / 256Mi request, 768Mi limit | |
 
 Probes: readiness and liveness on `GET /api/health`.
+
+Besides the Deployment, Service and routing, the release creates:
+
+- **ServiceAccount `oan-dashboards`** for the pod, with no API token mounted. The namespace's
+  shared `default` ServiceAccount is not touched.
+- **ECR pull secret `oan-dashboards-ecr`.** ECR tokens expire after 12 hours, so the release keeps
+  the secret current itself:
+  - A `pre-install,pre-upgrade` hook Job (`oan-dashboards-ecr-refresh-init`) writes the secret
+    before the pod is created or rolled. The first deploy therefore pulls without any manual step.
+  - A CronJob (`oan-dashboards-ecr-refresh`) refreshes it every 8 hours.
+  - Both fetch the token with the node's IAM role (`aws ecr get-login-password`), the same as the
+    registry namespaces. Their Role can write only this one secret.
+
+All names start with the release name, so nothing collides with the `commons` platform release.
 
 ## Jenkins pipeline (`Jenkinsfile`)
 
 | Stage | Where | What it does |
 | --- | --- | --- |
 | Checkout | any agent | `checkout scm` |
-| ECR Login | any agent | `aws ecr get-login-password` with credential `aws-ecr-creds` |
+| ECR Login | any agent | `aws ecr get-login-password` with credential `aws-ecr-creds`. Creates the repository `openg2p/oan-dashboards` (scan on push) if it does not exist yet |
 | Build & Push | any agent | Builds the image and pushes `<commit sha12>`. `develop` and `staging` also move a tag of their own name |
 | Stash chart | any agent | Stashes `helm/oan-dashboards` for the deploy agent |
-| Deploy (oan namespace) | `vpn-agent2`, `develop`/`staging` only | `helm upgrade --install oan-dashboards` in `oan` with the image and the environment's public host, `--wait`; `kubectl rollout status`; then a **smoke test** |
+| Deploy (commons namespace) | `vpn-agent2`, `develop`/`staging` only | `helm upgrade --install oan-dashboards` in `commons` with the image and the environment's public host, `--wait`; `kubectl rollout status`; then a **smoke test** |
 
 **Smoke test.** From inside the new pod, the pipeline calls `/api/health` and loads five farmer
 charts through the Service. It fails the build if any chart fails. A freshly started pod has an
 empty cache, so this proves the dashboards can reach the farmer registry dashboard service.
 
-## Setting up the Jenkins job
+## Jenkins job
 
-Once per Jenkins instance:
+The job is a **GitHub Organization Folder** at the top level of Jenkins, set up like the registry
+folders ("Gen2 application", "oan application").
 
-1. **New Item → Multibranch Pipeline**, named `oan-dashboards`.
-2. **Branch source:** GitHub, repository
-   `Centre-for-Open-Societal-Systems/oan_dashboards`, using the same GitHub credential as the
-   farmer-registry job. Behaviours: discover branches, and pull requests from origin and forks.
-3. **Build configuration:** by Jenkinsfile, script path `Jenkinsfile`.
-4. **Scan triggers:** a GitHub webhook (`https://<jenkins>/github-webhook/`, push and pull request
-   events). Optionally, also a periodic scan every few hours as a fallback.
-5. **Environment:** set `AWS_ACCOUNT_ID` for the job, as for farmer-registry. For example, with the
-   Folder Properties or Environment Injector plugin, or as a global property.
-6. **Credentials** (Manage Jenkins → Credentials):
-   - `aws-ecr-creds`: already exists; reused.
-   - `oan-dev-kubeconfig` and `oan-staging-kubeconfig`: **Secret file** credentials, built in
-     [Cluster bootstrap](#cluster-bootstrap-once-per-cluster).
-7. **Agents:** the deploy stage runs on the node labelled `vpn-agent2`, the only one with access to
-   the cluster APIs. It needs `helm` and `kubectl`, as for farmer-registry.
+| Setting | Value |
+| --- | --- |
+| Item | `OAN-Dashboard`, display name "oan dashboard" |
+| Owner | GitHub organization `Centre-for-Open-Societal-Systems`, credential `oan-ci-app` (GitHub App) |
+| Repositories | filter by name: `oan_dashboards` |
+| Branches | discover branches (all); filter by name: `develop staging` |
+| Project recognizer | `Jenkinsfile` |
+| Scan | periodically, every 4 hours, plus the organization's GitHub App events |
+| Orphaned items | branches deleted in GitHub are removed |
+
+Inside it, Jenkins creates the multibranch project `oan_dashboards`, with one job per branch that
+has a `Jenkinsfile`: `develop` (deploys to dev) and `staging` (deploys to staging).
+
+Nothing else is configured on the job:
+
+- `AWS_ACCOUNT_ID` is a global Jenkins variable.
+- `aws-ecr-creds`, `gen2-dev-kubeconfig` and `staging-farmer-kubeconfig` already exist and are shared
+  with the farmer registry.
+- The deploy stage runs on `vpn-agent2`, which has `helm`, `kubectl` and access to both cluster APIs.
+
+To recreate the folder, copy an existing registry folder: **New Item → Organization Folder**, or
+`POST /createItem?name=OAN-Dashboard` with that folder's `config.xml`. Then change the repository
+filter, the branch filter and the display name as in the table above.
 
 ## One-time prerequisites
 
 ### ECR repository
 
-Create the ECR repository `openg2p/oan-dashboards` in `ap-south-1`, with mutable tags. The IAM
-user behind `aws-ecr-creds` must be able to push to it, and the cluster nodes' IAM role must be able
-to pull from it (the same as for `openg2p/farmer-registry/*`).
+The pipeline creates `openg2p/oan-dashboards` in `ap-south-1` on its first build. If the IAM user
+behind `aws-ecr-creds` may push but not create repositories, the build stops with a clear message.
+Create the repository once by hand in that case. The cluster nodes' IAM role must be able to pull
+from it, as for `openg2p/farmer-registry/*`.
 
-### Cluster bootstrap (once per cluster)
+### Deploy permission (once per cluster)
 
-Jenkins deploys as the namespace-scoped ServiceAccount `oan:oan-ci`, so a cluster admin creates the
-namespace and that identity first. On the cluster node:
-
-```sh
-export AWS_ACCOUNT_ID=<ECR account id>
-envsubst '${AWS_ACCOUNT_ID}' < deploy/k8s/oan-bootstrap.yaml \
-  | sudo KUBECONFIG=/etc/rancher/rke2/rke2.yaml kubectl apply -f -
-sudo KUBECONFIG=/etc/rancher/rke2/rke2.yaml \
-  kubectl -n oan create job --from=cronjob/ecr-creds-refresh ecr-creds-init   # first pull secret now
-```
-
-This creates, in `oan`:
-- the CI ServiceAccount `oan-ci`, with namespace `admin` and Istio rights
-- the ECR pull secret `oan-ecr`, refreshed every 8 hours and attached to the `default`
-  ServiceAccount
-
-It follows the same pattern as `far`, `crop` and `live`.
-
-Build the kubeconfig for Jenkins from the `oan-ci` token:
+Jenkins deploys as `far:farmer-ci`, which initially has rights only in `far` and `crop`. A cluster
+admin grants it the same rights in `commons`, on the dev cluster and on staging:
 
 ```sh
-export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
-SERVER=https://10.0.1.166:6443          # staging: its own API server address
-kubectl -n oan get secret oan-ci-token -o jsonpath='{.data.ca\.crt}' | base64 -d > /tmp/oan-ca.crt
-TOKEN=$(kubectl -n oan get secret oan-ci-token -o jsonpath='{.data.token}' | base64 -d)
-KC=/tmp/oan-ci-kubeconfig.yaml
-kubectl config --kubeconfig=$KC set-cluster oan --server=$SERVER --certificate-authority=/tmp/oan-ca.crt --embed-certs=true
-kubectl config --kubeconfig=$KC set-credentials oan-ci --token="$TOKEN"
-kubectl config --kubeconfig=$KC set-context oan --cluster=oan --user=oan-ci --namespace=oan
-kubectl config --kubeconfig=$KC use-context oan
-kubectl --kubeconfig=$KC auth can-i create deployments -n oan      # yes
-kubectl --kubeconfig=$KC auth can-i create gateways.networking.istio.io -n oan   # yes
+sudo KUBECONFIG=/etc/rancher/rke2/rke2.yaml kubectl apply -f deploy/k8s/commons-deploy-rbac.yaml
 ```
 
-Upload `$KC` to Jenkins as the Secret-file credential (`oan-dev-kubeconfig` or
-`oan-staging-kubeconfig`), then delete `/tmp/oan-ca.crt` and `$KC`.
+This applies namespace-scoped `admin` plus the Istio objects that `admin` does not cover. It is the
+only cluster change made outside the pipeline, because farmer-ci cannot grant itself rights. Check
+it:
 
-Optionally, move the namespace into a Rancher project, as the other namespaces are, for visibility
-in the Rancher UI.
+```sh
+kubectl auth can-i create deployments -n commons --as=system:serviceaccount:far:farmer-ci             # yes
+kubectl auth can-i create gateways.networking.istio.io -n commons --as=system:serviceaccount:far:farmer-ci  # yes
+```
 
 ### Public hostname (once per environment)
 
@@ -171,11 +177,11 @@ ingress. For a new hostname:
 ## First deploy checklist
 
 1. The farmer registry dashboard service is deployed in `far` (farmer-registry pipeline).
-2. ECR repository `openg2p/oan-dashboards` exists.
-3. Cluster bootstrap is applied, and the `oan-dev-kubeconfig` credential is uploaded.
-4. DNS, nginx and the certificate are set up for the public hostname.
-5. The Jenkins job has been created; push to `develop` or re-run the job.
-6. Check: `https://oan-dashboard-development.oanstaging.com` loads, and
+2. `deploy/k8s/commons-deploy-rbac.yaml` is applied on the cluster.
+3. DNS, nginx and the certificate are set up for the public hostname.
+4. The `Jenkinsfile` is on `develop`. The next scan of the `OAN-Dashboard` folder creates the
+   `develop` job, or run **Scan Organization Now**.
+5. Check: `https://oan-dashboard-development.oanstaging.com` loads, and
    `/api/charts?charts=farmerKpis` returns `summary.failed = 0`.
 
 ## Scaling and load
@@ -198,10 +204,11 @@ ingress. For a new hostname:
 
 | Symptom | Likely cause | Action |
 | --- | --- | --- |
-| Deploy stage: `forbidden` | Kubeconfig credential missing, wrong, or for another namespace | Rebuild it from `oan-ci-token` and check with `auth can-i` |
-| Pod `ImagePullBackOff` | `oan-ecr` missing or expired, or ECR repository missing | `kubectl -n oan get secret oan-ecr`; run the refresher job by hand; check the repository exists |
+| Deploy stage: `forbidden` in `commons` | `commons-deploy-rbac.yaml` not applied on that cluster | Apply it, then check with `auth can-i` as `far:farmer-ci` ([Deploy permission](#deploy-permission-once-per-cluster)) |
+| Deploy stage: hook `oan-dashboards-ecr-refresh-init` failed | The node's IAM role cannot get an ECR token, or Docker Hub images cannot be pulled | `kubectl -n commons logs job/oan-dashboards-ecr-refresh-init --all-containers` |
+| Pod `ImagePullBackOff` | `oan-dashboards-ecr` missing or expired, or the image is missing from ECR | `kubectl -n commons get secret oan-dashboards-ecr`; `kubectl -n commons create job --from=cronjob/oan-dashboards-ecr-refresh ecr-refresh-now`; check the tag exists |
 | Smoke test: `charts failed: … No data` or `refresh failed` | The dashboards cannot reach the farmer registry dashboard service | `kubectl -n far get deploy farmer-registry-dashboard-api`; from the pod, `node -e "fetch('http://farmer-registry-dashboard-api.far/health').then(r=>console.log(r.status))"` |
-| Public URL: 404 from Istio | Gateway or VirtualService missing, or host mismatch | `kubectl -n oan get gateway,virtualservice`; the host must equal `ingress.public.host` |
+| Public URL: 404 from Istio | Gateway or VirtualService missing, or host mismatch | `kubectl -n commons get gateway,virtualservice`; the host must equal `ingress.public.host` |
 | Public URL: TLS error or nginx default page | nginx site or certificate missing | Complete [Public hostname](#public-hostname-once-per-environment) |
 | Filters empty | `/api/filter-options` failing | Check pod logs. Regions come from the bundled boundaries; record statuses come from the farmer registry service |
 | Figures lag the registry | Reporting-view refresh interval plus the cache period | Wait, or restart the deployment to clear the cache |

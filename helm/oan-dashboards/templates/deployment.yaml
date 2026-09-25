@@ -14,7 +14,13 @@ spec:
       labels:
         {{- include "oan-dashboards.selectorLabels" . | nindent 8 }}
     spec:
-      {{- with .Values.imagePullSecrets }}
+      serviceAccountName: {{ include "oan-dashboards.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      {{- $pullSecrets := .Values.imagePullSecrets }}
+      {{- if .Values.ecrPullSecret.enabled }}
+      {{- $pullSecrets = prepend $pullSecrets (dict "name" .Values.ecrPullSecret.name) }}
+      {{- end }}
+      {{- with $pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}

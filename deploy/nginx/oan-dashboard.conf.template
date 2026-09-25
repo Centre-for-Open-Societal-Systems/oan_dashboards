@@ -1,7 +1,7 @@
 # Host nginx site for the public dashboards hostname, the same shape as the
 # other *.oanstaging.com sites on the box. TLS terminates here; traffic goes
 # to the Istio ingress gateway (upstream istio_ingress, defined in
-# openg2p-infra.conf), which routes on Host to the oan namespace.
+# openg2p-infra.conf), which routes on Host to the release in `commons`.
 #
 # Render for an environment and install (see docs/deployment.md "Public hostname"):
 #   HOST=oan-dashboard-development.oanstaging.com    # staging: oan-dashboard.oanstaging.com

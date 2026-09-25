@@ -15,7 +15,7 @@ pipeline {
         ECR_REPOSITORY = "openg2p/oan-dashboards"
 
         HELM_RELEASE   = "oan-dashboards"
-        HELM_NAMESPACE = "oan"
+        HELM_NAMESPACE = "commons"
         HELM_CHART_DIR = "helm/oan-dashboards"
     }
 
@@ -28,6 +28,13 @@ pipeline {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-creds']]) {
                     sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
+                    // The repository is part of the deployment: create it on the first build.
+                    sh """
+                        aws ecr describe-repositories --region ${AWS_REGION} --repository-names ${ECR_REPOSITORY} >/dev/null 2>&1 \
+                          || aws ecr create-repository --region ${AWS_REGION} --repository-name ${ECR_REPOSITORY} \
+                               --image-scanning-configuration scanOnPush=true >/dev/null \
+                          || { echo "ECR repository ${ECR_REPOSITORY} is missing and aws-ecr-creds may not create it: create it once in ${AWS_REGION}"; exit 1; }
+                    """
                 }
             }
         }
@@ -59,10 +66,12 @@ pipeline {
             }
         }
 
-        stage('Deploy (oan namespace)') {
+        stage('Deploy (commons namespace)') {
             // develop -> dev cluster, staging -> staging cluster; other branches only
-            // build and push. Each credential is a kubeconfig for the oan:oan-ci
-            // service account created by deploy/k8s/oan-bootstrap.yaml.
+            // build and push. Same credentials as the farmer registry deploy: each is
+            // a kubeconfig for far:farmer-ci on that cluster, which
+            // deploy/k8s/commons-deploy-rbac.yaml lets deploy into commons. The
+            // release creates everything else it needs, including its ECR pull secret.
             when {
                 beforeAgent true
                 anyOf {
@@ -72,7 +81,7 @@ pipeline {
             }
             agent { label 'vpn-agent2' }
             environment {
-                KUBECONFIG_CREDENTIAL = "${env.BRANCH_NAME == 'staging' ? 'oan-staging-kubeconfig' : 'oan-dev-kubeconfig'}"
+                KUBECONFIG_CREDENTIAL = "${env.BRANCH_NAME == 'staging' ? 'staging-farmer-kubeconfig' : 'gen2-dev-kubeconfig'}"
                 PUBLIC_HOST           = "${env.BRANCH_NAME == 'staging' ? 'oan-dashboard.oanstaging.com' : 'oan-dashboard-development.oanstaging.com'}"
             }
             steps {
