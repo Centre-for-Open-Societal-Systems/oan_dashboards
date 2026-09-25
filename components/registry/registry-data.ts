@@ -25,6 +25,36 @@ export function toNumber(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+// Age bands as the GEN2 reporting view defines them (policy, set in the
+// registry's reporting.yaml). farmersByAgeAndGender returns these codes.
+export const AGE_BANDS = ["UNDER_25", "25_34", "35_49", "50_64", "65_PLUS", "UNKNOWN"] as const
+
+const AGE_BAND_LABELS: Record<string, string> = {
+  UNDER_25: "Under 25",
+  "25_34": "25–34",
+  "35_49": "35–49",
+  "50_64": "50–64",
+  "65_PLUS": "65+",
+  UNKNOWN: "Unknown",
+}
+
+export function ageBandLabel(band: string): string {
+  return AGE_BAND_LABELS[band] ?? band
+}
+
+// landTenureSplit returns the registry's land_ownership_type enum.
+const TENURE_LABELS: Record<string, string> = {
+  OWNER: "Owner",
+  TENANT: "Tenant",
+  CROP_SHARE: "Crop share",
+  UNKNOWN: "Unknown",
+}
+
+export function tenureLabel(value: unknown): string {
+  const key = String(value || "UNKNOWN")
+  return TENURE_LABELS[key] ?? key
+}
+
 /** "2025-07" -> "Jul 2025" */
 export function monthLabel(period: string): string {
   const [year, month] = String(period || "").split("-")

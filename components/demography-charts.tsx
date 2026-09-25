@@ -21,6 +21,7 @@ import { KPICard } from "@/components/kpi-card"
 import { formatCompactNumber, formatFullNumber } from "@/lib/number-format"
 import { useChartGroupData } from "@/hooks/use-data"
 import { DashboardSectionSkeleton } from "@/components/ui/dashboard-skeleton"
+import { AGE_BANDS, ageBandLabel } from "@/components/registry/registry-data"
 
 interface DemographyChartsProps {
   filters: {
@@ -170,7 +171,7 @@ export function DemographyCharts({ filters, onMapFilterChange, geoJsonData, init
 
   // Process age and gender data for stacked chart
   const ageGenderChartData = useMemo(() => {
-    const ageGroups = ['0-18', '18-30', '30-50', '50-70', '70+', 'Unknown']
+    const ageGroups: readonly string[] = AGE_BANDS
     const ageMap = new Map<string, { age_group: string; male: number; female: number; unknown: number }>()
 
     // Initialize all age groups
@@ -199,6 +200,7 @@ export function DemographyCharts({ filters, onMapFilterChange, geoJsonData, init
     return ageGroups
       .map(group => ageMap.get(group)!)
       .filter(item => !(item.age_group.toLowerCase() === 'unknown' && (item.male + item.female + item.unknown === 0)))
+      .map(item => ({ ...item, age_group: ageBandLabel(item.age_group) }))
   }, [ageGenderData])
   const showUnknownAge = useMemo(() => ageGenderChartData.some(item => item.unknown > 0), [ageGenderChartData])
 

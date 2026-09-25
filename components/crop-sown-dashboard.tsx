@@ -37,6 +37,7 @@ import {
   RegistryFilters,
   buildTrend,
   monthLabel,
+  tenureLabel,
   toNumber,
   useRegistryTrend,
 } from "@/components/registry/registry-data"
@@ -60,8 +61,8 @@ const CROP_CHILD_CHARTS = {
 
 const TENURE_COLORS: Record<string, string> = {
   Owner: BRIGHT.green,
-  Rented: BRIGHT.amber,
-  Shared: BRIGHT.tealSoft,
+  Tenant: BRIGHT.amber,
+  "Crop share": BRIGHT.tealSoft,
   Unknown: "#9CA3AF",
 }
 
@@ -122,9 +123,9 @@ export function CropSownDashboard({
     () =>
       (charts.landTenureSplit || [])
         .map((row: any) => ({
-          name: row.ownership_type,
+          name: tenureLabel(row.ownership_type),
           value: toNumber(row.parcels),
-          color: TENURE_COLORS[row.ownership_type] || BRIGHT.violet,
+          color: TENURE_COLORS[tenureLabel(row.ownership_type)] || BRIGHT.violet,
           sub: `${formatCompact(toNumber(row.area))} ha`,
         }))
         .filter((segment: { value: number }) => segment.value > 0),
