@@ -1,5 +1,7 @@
 # Data Integration & Query Routing
 
+> **Registries (GEN2 farmer registry):** this page describes the older direct-SQL design. The current design (dashboard API, 15-minute cache) is [farmer-registry-dashboard-design.md](farmer-registry-dashboard-design.md).
+
 A core feature of the `oan_dashboards` architecture is its ability to seamlessly multiplex queries across two entirely different database schemas (the legacy Odoo `res_partner` schema and the new OpenG2P Gen2 schema) without exposing the complexity to the frontend.
 
 ## Dynamic Database Routing

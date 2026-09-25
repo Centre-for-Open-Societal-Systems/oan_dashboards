@@ -1,5 +1,7 @@
 # Architecture Overview
 
+> **Registries (GEN2 farmer registry):** this page describes the older direct-SQL design. The current design (dashboard API, 15-minute cache) is [farmer-registry-dashboard-design.md](farmer-registry-dashboard-design.md).
+
 The `oan_dashboards` application is a high-performance, Next.js-based analytics and visualization dashboard built for the OpenG2P ecosystem. It aggregates and displays agricultural, demographic, and operational data.
 
 ## High-Level Architecture
