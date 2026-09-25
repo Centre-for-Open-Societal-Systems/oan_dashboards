@@ -39,7 +39,8 @@ export const DASHBOARD_SERVICES: readonly DashboardService[] = [
     urlEnv: 'FARMER_REGISTRY_DASHBOARD_API_URL',
     filters: [...GEO_FILTERS, 'farmingType', 'recordState'],
     charts: [
-      'farmerKpis', 'farmersByRegion', 'farmersByGender', 'farmersByType',
+      'farmerKpis', 'farmersByRegion', 'farmersByZone', 'farmersByWoreda', 'farmersByKebele',
+      'farmersByFarmerId', 'farmersByGender', 'farmersByType',
       'farmersByAgeAndGender', 'farmersByEducation', 'landTenureSplit',
       'registryTrendByMonth', 'registryCoverage', 'farmersByRecordState',
       'farmersByImportStatus', 'farmersByPsnpStatus',

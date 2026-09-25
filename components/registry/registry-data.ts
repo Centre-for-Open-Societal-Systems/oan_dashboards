@@ -1,6 +1,6 @@
 // Shared data shaping for the Crop Sown and Livestock registry dashboards.
 
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 export interface RegistryFilters {
   region: string
@@ -126,4 +126,73 @@ export function buildTrend(
       note: `vs previous ${window} months`,
     },
   }
+}
+
+// ---------------------------------------------------------------------------
+// Geographic coverage
+// ---------------------------------------------------------------------------
+
+/** A woreda in the map boundaries, with its parent P-codes. */
+export interface WoredaUnit {
+  woreda: string
+  zone: string
+  region: string
+}
+
+let woredaUnitsRequest: Promise<WoredaUnit[]> | null = null
+
+function loadWoredaUnits(): Promise<WoredaUnit[]> {
+  woredaUnitsRequest ??= fetch("/api/maps/units")
+    .then(res => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return res.json() as Promise<WoredaUnit[]>
+    })
+    .catch(error => {
+      woredaUnitsRequest = null // allow a retry on the next mount
+      throw error
+    })
+  return woredaUnitsRequest
+}
+
+/** Every woreda the map can draw. Loaded once per page. */
+export function useWoredaUnits(): WoredaUnit[] | null {
+  const [units, setUnits] = useState<WoredaUnit[] | null>(null)
+  useEffect(() => {
+    let active = true
+    loadWoredaUnits()
+      .then(list => { if (active) setUnits(list) })
+      .catch(() => { if (active) setUnits([]) })
+    return () => { active = false }
+  }, [])
+  return units
+}
+
+const selected = (value: string | undefined) => (value && value !== "all" ? value.toUpperCase() : null)
+
+/**
+ * Woredas reached by the registry within the selected area.
+ *
+ * The denominator is the woredas of the map boundaries inside the current
+ * region / zone / woreda filter; the numerator is those with at least one
+ * farmer in `farmersByWoreda` (fetched with the same filters). Both come from
+ * the same codes the map draws, so coverage and the map always agree.
+ */
+export function woredaCoverage(
+  units: WoredaUnit[] | null,
+  filters: Pick<RegistryFilters, "region" | "zone" | "woreda">,
+  woredaRows: Array<Record<string, unknown>> | undefined
+): { total: number; covered: number } {
+  if (!units) return { total: 0, covered: 0 }
+  const region = selected(filters.region)
+  const zone = selected(filters.zone)
+  const woreda = selected(filters.woreda)
+  const inScope = units.filter(u =>
+    woreda ? u.woreda === woreda : zone ? u.zone === zone : region ? u.region === region : true
+  )
+  const reached = new Set(
+    (woredaRows || [])
+      .filter(row => toNumber(row.farmers) > 0)
+      .map(row => String(row.woreda_code || "").toUpperCase())
+  )
+  return { total: inScope.length, covered: inScope.filter(u => reached.has(u.woreda)).length }
 }

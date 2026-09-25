@@ -25,7 +25,7 @@ Each group below moves to its registry's dashboard service as that service becom
 
 | Group | Chart IDs | Current source |
 | --- | --- | --- |
-| Farmer registry panels not yet on the service | `farmersByZone`, `farmersByWoreda`, `farmersByKebele`, `landStats`, `landAreaByRegion`, `demographyStats`, `socioEconomicKpis`, `recentRegistrations` | `res_partner` and related `g2p_*` tables |
+| Farmer registry panels not yet on the service | `landStats`, `landAreaByRegion`, `demographyStats`, `socioEconomicKpis`, `recentRegistrations`, `householdIncomeSources` | `res_partner` and related `g2p_*` tables |
 | Crop and livestock registry panels | `crop*`, `livestock*` | crop and livestock tables |
 | Catalogs | `catalog*` | `crop_catalog`, `crop_variety`, `livestock_*`, `seed_*`, location catalogue |
 | Access to Credit | `a2c*` | `a2c_*` tables, through the `A2C_SCOPE` views |

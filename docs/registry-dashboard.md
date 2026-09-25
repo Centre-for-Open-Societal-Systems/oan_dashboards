@@ -39,16 +39,17 @@ flowchart LR
 
 | Chart ID | Used in | Fields | Notes |
 | --- | --- | --- | --- |
-| `farmerKpis` | Key indicators, farm profile | `total_farmers, female_farmers, male_farmers, total_land_size, avg_farm_size, farmers_with_owned_land, household_heads, farmers_with_id, farmers_without_id` | The last three are always 0 until the registry reports them |
-| `farmersByRegion` | Farmers by region, map | `region, region_code, farmers` | `region_code` joins to map features |
+| `farmerKpis` | Key indicators, farm profile | `total_farmers, female_farmers, male_farmers, total_land_size, avg_farm_size, farmers_with_owned_land, household_heads, farmers_with_id, farmers_without_id` | `household_heads` is always 0 until the registry reports it |
+| `farmersByRegion` | Farmers by region, map (national view) | `region, region_code, farmers` | `region_code` joins to map features |
+| `farmersByZone`, `farmersByWoreda`, `farmersByKebele` | Map drill-down and list view; `farmersByWoreda` also drives Geographic Coverage | `zone`/`woreda`/`kebele`, `*_code`, `farmers` | Codes are administrative P-codes, matched **exactly** to map boundaries |
+| `farmersByFarmerId` | Key indicators (with farmer ID) | `id_status, farmers` | From the registry's functional record id |
 | `farmersByGender` | Demographic profile | `gender, farmers` | Codes: `MALE`, `FEMALE`, … |
 | `farmersByType` | Farmers by farming type | `farming_type, farmers` | |
 | `farmersByAgeAndGender` | Demographic profile, youth and elderly KPIs | `age_group, gender, farmers` | Bands `UNDER_25, 25_34, 35_49, 50_64, 65_PLUS, UNKNOWN`. The bands are registry policy, and the UI labels them |
 | `farmersByEducation` | Education profile | `education, farmers` | |
 | `farmersByRecordState` | Record status indicators | `record_state, farmers` | Covers every status |
-| `landTenureSplit` | Land tenure (overview, crop, livestock) | `ownership_type, parcels, area` | Per parcel. Codes: `OWNER`, `TENANT`, `CROP_SHARE`, labelled in the UI |
+| `landTenureSplit` | Land tenure (overview, crop, livestock) | `ownership_type, parcels, area` | Per parcel, for the parcels of the farmers matching the filters (a parcel lying outside its owner's area still counts under the owner's). Codes: `OWNER`, `TENANT`, `CROP_SHARE`, labelled in the UI |
 | `registryTrendByMonth` | Registrations per month, registered vs owned area | `period (YYYY-MM), farmers, total_area, owned_area` | |
-| `registryCoverage` | Geographic coverage | `{regions,zones,woredas,kebeles}_{covered,total}` | Totals are service configuration. `null` means unknown, and the UI then shows 0% |
 | `farmersByPsnpStatus`, `farmersByImportStatus` | Indicator tiles | always `[]` | No registry equivalent yet |
 
 These chart IDs are declared for the `farmer-registry` entry of `DASHBOARD_SERVICES` in `server/dashboard-services.ts`.
@@ -73,6 +74,19 @@ The sidebar filters map to service parameters as follows:
 | Farming Type | `farmingType` | `crop` / `livestock` / `mixed`, matched case-insensitively. *Crop* and *Livestock* also switch to the dedicated registry view |
 | Record Status | `recordState` | If not set, only **active** records are counted |
 | Type of Farmer | `farmerType` | Not applied to registry charts |
+
+## Map and geographic coverage
+
+- **Map.** The national view colours regions from `farmersByRegion`. Drilling into a region, zone or
+  woreda requests `farmersByZone`, `farmersByWoreda` or `farmersByKebele` with the same filters as
+  the rest of the page, including record status. The map, the list view and the KPI cards therefore
+  count the same farmers. Units are matched to boundary shapes by their exact P-code.
+- **Geographic Coverage** is computed in the dashboard from two sources:
+  - the **denominator** is the woredas of the map boundaries inside the selected region, zone or
+    woreda, from `GET /api/maps/units`
+  - the **numerator** is those woredas with at least one farmer in `farmersByWoreda`
+
+  Coverage can therefore never disagree with the map. No national totals need to be configured.
 
 ## Caching and freshness
 
@@ -101,17 +115,15 @@ To force fresh figures, restart the dashboards server or wait one cache period.
 
 ## Known limitations
 
-- **Mixed sources on the Registries dashboard.** Some panels still query the dashboard database
-  rather than the registry:
-  - farmers by zone, woreda and kebele
-  - land statistics
-  - crop and livestock indicators
-  - latest registrations
-
-  They show seeded reference data until they move to the farmer registry dashboard service.
+- **Crop and livestock views.** Their crop and livestock indicators, land statistics and the Crop
+  view's map (hectares by zone and woreda) still query the transitional dashboard database. They show
+  seeded reference data until they move to a dashboard service. The overview is served entirely by
+  the farmer registry dashboard service.
+- **Units the map cannot draw.** A few registry units are not in the map boundaries: special woredas
+  whose hierarchy skips a level, and units created after the boundaries were published. They appear
+  in the map's list view and the totals, but not as shapes.
 - **Record status tiles.** The overview counts `approved`, `rejected` and `pending` records, but the
   registry uses a different status vocabulary (for example `ACTIVE`), so those tiles show 0.
 - **Unavailable indicators.** The registry reporting views have no source yet for household heads,
-  farmer ID coverage, PSNP participation or legacy-import status.
-- **Coverage percentage.** The percentage needs the national unit counts to be configured in the service
-  (`GEO_LEVEL_TOTALS`).
+  PSNP participation or legacy-import status.
+

@@ -159,17 +159,6 @@ function buildA2CClauses(filters: ChartFilters): { geo: string; provider: string
 }
 
 const chartFilterOverrides: Record<string, FilterOverrides> = {
-  farmersByWoreda: {
-    region: 'rp.region',
-    zone: 'rp.zone',
-    woreda: 'w.id',
-  },
-  farmersByKebele: {
-    region: 'rp.region',
-    zone: 'rp.zone',
-    woreda: 'w.id',
-    kebele: 'k.id',
-  },
   cropAreaByWoreda: {
     region: 'rp.region',
     zone: 'rp.zone',

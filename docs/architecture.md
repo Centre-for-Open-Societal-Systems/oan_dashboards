@@ -57,6 +57,7 @@ flowchart TB
 | Service map and cache | `server/dashboard-services.ts` | `DASHBOARD_SERVICES`: service id, URL variable, accepted filters and chart IDs for each service. Shared response cache |
 | Warm-up | `instrumentation.ts` | Pre-loads the unfiltered charts of every configured service at start-up and every cache period |
 | Map geometry | `app/api/maps/[level]/route.ts` | Serves region, zone and woreda boundaries (Brotli TopoJSON in `public/maps`) as GeoJSON |
+| Boundary units | `app/api/maps/units/route.ts` | Every woreda in the boundaries with its zone and region P-codes (no geometry). The denominator for geographic coverage |
 | Registry dashboard services | separate repositories | Read-only aggregate APIs, one per registry |
 
 ## Request flow

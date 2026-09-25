@@ -54,6 +54,8 @@ import {
   tenureLabel,
   toNumber,
   useRegistryTrend,
+  useWoredaUnits,
+  woredaCoverage,
 } from "@/components/registry/registry-data"
 import { ExportDataButton } from "@/components/registry/export-button"
 
@@ -69,7 +71,7 @@ const CHART_NAMES = [
   "farmersByRecordState",
   "landTenureSplit",
   "registryTrendByMonth",
-  "registryCoverage",
+  "farmersByWoreda",
 ]
 
 const TYPE_PALETTE = BRIGHT_SERIES as unknown as string[]
@@ -207,10 +209,12 @@ export function FarmerOverviewDashboard({
     return { approved, rejected, open }
   }, [charts.farmersByRecordState])
 
-  const coverage = charts.registryCoverage?.[0] || null
-  const woredasTotal = toNumber(coverage?.woredas_total)
-  const woredasCovered = toNumber(coverage?.woredas_covered)
-  const woredaCoverage = woredasTotal > 0 ? (woredasCovered / woredasTotal) * 100 : 0
+  const woredaUnits = useWoredaUnits()
+  const { total: woredasTotal, covered: woredasCovered } = useMemo(
+    () => woredaCoverage(woredaUnits, filters, charts.farmersByWoreda),
+    [woredaUnits, filters, charts.farmersByWoreda]
+  )
+  const coveragePercent = woredasTotal > 0 ? (woredasCovered / woredasTotal) * 100 : 0
 
   const psnpUsers = useMemo(
     () =>
@@ -560,7 +564,7 @@ export function FarmerOverviewDashboard({
                     color: BRIGHT.red,
                   },
                 ]}
-                centerValue={`${woredaCoverage.toFixed(1)}%`}
+                centerValue={`${coveragePercent.toFixed(1)}%`}
                 centerLabel="Coverage"
                 totalLabel="Woredas"
                 totalValue={formatFull(woredasTotal)}

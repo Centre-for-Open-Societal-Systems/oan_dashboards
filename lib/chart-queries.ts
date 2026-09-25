@@ -86,52 +86,6 @@ export const GEN2_SCOPE = `
 // parameterized 'AND ...' clause if filters are applied.
 export const CHART_QUERIES: { [key: string]: string } = {
   // === Farmer Dashboard Charts ===
-  farmersByZone: `
-    SELECT
-      COALESCE(z.name, 'Unknown') as zone,
-      z.code as zone_code,
-      COUNT(DISTINCT rp.id) as farmers
-    FROM res_partner rp
-    LEFT JOIN g2p_zone z ON rp.zone = z.id
-    WHERE rp.is_farmer = 'yes'
-      AND rp.is_registrant = TRUE
-      AND rp.is_GROUP = FALSE
-      --- DYNAMIC_FILTERS ---
-    GROUP BY z.name, z.code
-    ORDER BY farmers DESC
-  `,
-
-  farmersByWoreda: `
-    SELECT
-      COALESCE(w.name, 'Unknown') as woreda,
-      w.code as woreda_code,
-      COUNT(DISTINCT rp.id) as farmers
-    FROM res_partner rp
-    LEFT JOIN g2p_woreda w ON rp.woreda = w.id
-    WHERE rp.is_farmer = 'yes'
-      AND rp.is_registrant = TRUE
-      AND rp.is_GROUP = FALSE
-      --- DYNAMIC_FILTERS ---
-    GROUP BY w.name, w.code
-    ORDER BY farmers DESC
-  `,
-
-  farmersByKebele: `
-    SELECT
-      COALESCE(k.name, 'Unknown') as kebele,
-      k.code as kebele_code,
-      COUNT(DISTINCT rp.id) as farmers
-    FROM res_partner rp
-    LEFT JOIN g2p_kebele k ON rp.kebele = k.id
-    LEFT JOIN g2p_woreda w ON k.woreda = w.id
-    WHERE rp.is_farmer = 'yes'
-      AND rp.is_registrant = TRUE
-      AND rp.is_GROUP = FALSE
-      --- DYNAMIC_FILTERS ---
-    GROUP BY k.name, k.code
-    ORDER BY farmers DESC
-  `,
-
   householdIncomeSources: `
     SELECT
       COALESCE(inc.name, 'Unknown') as income_source,
@@ -255,22 +209,6 @@ export const CHART_QUERIES: { [key: string]: string } = {
     ORDER BY farmers DESC
   `,
 
-  farmersByFarmerId: `
-    SELECT
-      CASE 
-        WHEN rp.farmer_id IS NOT NULL AND rp.farmer_id != '' THEN 'With Farmer ID'
-        ELSE 'Without Farmer ID'
-      END as id_status,
-      COUNT(DISTINCT rp.id) as farmers
-    FROM res_partner rp
-    LEFT JOIN g2p_region reg ON rp.region = reg.id
-    WHERE rp.is_farmer = 'yes'
-      AND rp.is_registrant = TRUE
-      AND rp.is_GROUP = FALSE
-      --- DYNAMIC_FILTERS ---
-    GROUP BY id_status
-    ORDER BY farmers DESC
-  `,
 
   farmersByEducation: `
     SELECT
