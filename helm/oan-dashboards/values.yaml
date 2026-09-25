@@ -1,0 +1,56 @@
+# OAN Dashboards. See docs/deployment.md.
+
+image:
+  repository: ""   # e.g. <account>.dkr.ecr.ap-south-1.amazonaws.com/openg2p/oan-dashboards
+  tag: ""          # set by CI: the commit sha (12)
+  pullPolicy: IfNotPresent
+
+# Pull secrets for the image. Usually empty: the namespace's default
+# ServiceAccount carries the ECR pull secret (deploy/k8s/oan-bootstrap.yaml).
+imagePullSecrets: []
+
+replicas: 1
+
+# Registry dashboard services, as reachable from the pod. One entry per
+# service declared in server/dashboard-services.ts (key = its URL variable).
+dashboardServices:
+  FARMER_REGISTRY_DASHBOARD_API_URL: http://farmer-registry-dashboard-api.far
+
+# Seconds a dashboard service response is cached (and the warm-up interval).
+cacheTtlSeconds: 900
+
+# Extra environment variables, as NAME: value. Values may use templates.
+# The transitional database (DATABASE_URL) is deliberately absent: without it
+# only the Registries dashboard is offered. Supply it from a Secret via
+# envFrom when the other dashboards are enabled.
+env: {}
+envFrom: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 768Mi
+
+service:
+  port: 80
+
+# Hostname routes through the Istio ingress gateway. TLS terminates at the
+# host's nginx, which forwards to the gateway on plain HTTP.
+ingress:
+  # Public hostname on this release's own Istio Gateway.
+  public:
+    enabled: false
+    host: ""             # e.g. oan-dashboard-development.oanstaging.com
+    gatewayName: public-oanstaging
+  # Private hostname on an existing gateway in this namespace (e.g. "internal"
+  # for *.<namespace>.openg2p.test), if one exists.
+  private:
+    enabled: false
+    host: ""
+    gateway: internal
+
+# Selector of the Istio ingress gateway pods.
+istioIngressSelector:
+  istio: ingressgateway

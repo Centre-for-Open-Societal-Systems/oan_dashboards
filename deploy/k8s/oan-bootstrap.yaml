@@ -1,0 +1,176 @@
+# One-time setup of the `oan` namespace, applied by a CLUSTER ADMIN on each
+# cluster (dev, staging) before the first Jenkins deploy. See
+# docs/deployment.md "Cluster bootstrap".
+#
+#   export AWS_ACCOUNT_ID=<account id of the ECR registry>
+#   envsubst '${AWS_ACCOUNT_ID}' < deploy/k8s/oan-bootstrap.yaml \
+#     | sudo KUBECONFIG=/etc/rancher/rke2/rke2.yaml kubectl apply -f -
+#   # First pull secret now rather than at the next 8-hourly run:
+#   sudo KUBECONFIG=/etc/rancher/rke2/rke2.yaml \
+#     kubectl -n oan create job --from=cronjob/ecr-creds-refresh ecr-creds-init
+#
+# It creates, in `oan` (the same shape as `far`, `crop` and `live`):
+#   - ServiceAccount oan-ci + long-lived token: the identity Jenkins deploys
+#     with. Namespace-scoped `admin`, plus Istio objects (the chart creates a
+#     Gateway and VirtualServices, which `admin` does not cover).
+#   - ECR pull secret `oan-ecr`, refreshed every 8 hours by CronJob
+#     ecr-creds-refresh (the node's IAM role fetches the token), and attached
+#     to the namespace's default ServiceAccount so pods pull without further
+#     configuration.
+#
+# Then build the Jenkins kubeconfig from the oan-ci token (commands in
+# docs/deployment.md) and store it as a Jenkins Secret-file credential.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: oan
+---
+# CI identity
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: oan-ci
+  namespace: oan
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: oan-ci-token
+  namespace: oan
+  annotations:
+    kubernetes.io/service-account.name: oan-ci
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: oan-ci-admin
+  namespace: oan
+subjects:
+  - kind: ServiceAccount
+    name: oan-ci
+    namespace: oan
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: admin
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ci-deploy-istio
+  namespace: oan
+rules:
+  - apiGroups: ["networking.istio.io", "security.istio.io"]
+    resources: ["*"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: oan-ci-istio
+  namespace: oan
+subjects:
+  - kind: ServiceAccount
+    name: oan-ci
+    namespace: oan
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ci-deploy-istio
+---
+# ECR pull secret, kept fresh (ECR tokens expire after 12 hours)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ecr-creds-refresher
+  namespace: oan
+  labels:
+    managed-by: manual-ecr-pull
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ecr-creds-writer
+  namespace: oan
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["oan-ecr"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ecr-creds-writer
+  namespace: oan
+subjects:
+  - kind: ServiceAccount
+    name: ecr-creds-refresher
+    namespace: oan
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ecr-creds-writer
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ecr-creds-refresh
+  namespace: oan
+  labels:
+    managed-by: manual-ecr-pull
+spec:
+  schedule: "0 */8 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          serviceAccountName: ecr-creds-refresher
+          restartPolicy: Never
+          initContainers:
+            - name: get-token
+              image: amazon/aws-cli:2.36.43
+              command: ["/bin/sh", "-c", "aws ecr get-login-password --region ap-south-1 > /token/ecr"]
+              volumeMounts:
+                - name: token
+                  mountPath: /token
+          containers:
+            - name: write-secret
+              image: alpine/k8s:1.31.1
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  kubectl create secret docker-registry oan-ecr \
+                    --namespace oan \
+                    --docker-server=${AWS_ACCOUNT_ID}.dkr.ecr.ap-south-1.amazonaws.com \
+                    --docker-username=AWS \
+                    --docker-password="$(cat /token/ecr)" \
+                    --dry-run=client -o yaml | kubectl apply -f -
+              volumeMounts:
+                - name: token
+                  mountPath: /token
+                  readOnly: true
+          volumes:
+            - name: token
+              emptyDir:
+                medium: Memory
+---
+# Pods in the namespace pull from ECR with the refreshed secret.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: oan
+imagePullSecrets:
+  - name: oan-ecr
