@@ -76,5 +76,8 @@ npx tsc --noEmit
 - Deployment: `Jenkinsfile`, `helm/oan-dashboards` (namespace `commons`; the release owns its ECR pull
   secret), `deploy/` (the one-time deploy permission and the nginx template). Everything else goes
   through the pipeline: never apply cluster objects by hand. See docs/deployment.md.
+- The deploy identity has a narrow role in `commons` (`deploy/k8s/commons-deploy-rbac.yaml`): no
+  Secret reads and no `pods/exec`. A new object type in the chart needs a rule there, which a
+  cluster admin applies before the deploy. Run Helm with `HELM_DRIVER=configmap`.
 - Conventional Commits (`feat(registry): …`, `fix: …`, `docs: …`).
 - Never commit `.env` files or one-off patch or replace scripts. Edit the source directly.

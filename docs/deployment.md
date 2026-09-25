@@ -85,8 +85,10 @@ All names start with the release name, so nothing collides with the `commons` pl
 | Stash chart | any agent | Stashes `helm/oan-dashboards` for the deploy agent |
 | Deploy (commons namespace) | `vpn-agent2`, `develop`/`staging` only | `helm upgrade --install oan-dashboards` in `commons` with the image and the environment's public host, `--wait`; `kubectl rollout status`; then a **smoke test** |
 
-**Smoke test.** From inside the new pod, the pipeline calls `/api/health` and loads five farmer
-charts through the Service. It fails the build if any chart fails. A freshly started pod has an
+**Smoke test.** Through the API server's proxy to the `oan-dashboards` Service, the pipeline calls
+`/api/health` and loads five farmer charts. It fails the build if any chart fails, and prints the
+failed charts with their errors. Helm runs with `HELM_DRIVER=configmap`: see
+[Deploy permission](#deploy-permission-once-per-cluster). A freshly started pod has an
 empty cache, so this proves the dashboards can reach the farmer registry dashboard service.
 
 ## Jenkins job
@@ -130,20 +132,44 @@ from it, as for `openg2p/farmer-registry/*`.
 ### Deploy permission (once per cluster)
 
 Jenkins deploys as `far:farmer-ci`, which initially has rights only in `far` and `crop`. A cluster
-admin grants it the same rights in `commons`, on the dev cluster and on staging:
+admin grants it a narrow role in `commons`, on the dev cluster and on staging:
 
 ```sh
 sudo KUBECONFIG=/etc/rancher/rke2/rke2.yaml kubectl apply -f deploy/k8s/commons-deploy-rbac.yaml
 ```
 
-This applies namespace-scoped `admin` plus the Istio objects that `admin` does not cover. It is the
-only cluster change made outside the pipeline, because farmer-ci cannot grant itself rights. Check
-it:
+This is the only cluster change made outside the pipeline, because farmer-ci cannot grant itself
+rights.
+
+`commons` also holds the shared platform's credentials: the Keycloak admin password, the Postgres
+superuser password and the Redis passwords. The role is therefore **not** the namespace `admin`
+role that farmer-ci has in `far`:
+
+- It covers only the object types the chart and the pipeline use: Deployments, Jobs and CronJobs,
+  Services, ServiceAccounts, ConfigMaps, Roles and RoleBindings, and the Istio Gateway and
+  VirtualService. It can also read pods, logs and events.
+- **Secrets:** farmer-ci may create a Secret and manage the release's own pull secret
+  (`oan-dashboards-ecr`) by name. It cannot list or read any other Secret. Helm therefore keeps
+  its release records in ConfigMaps (`HELM_DRIVER=configmap` in the `Jenkinsfile`).
+- **No `pods/exec` or port-forward.** The smoke test goes through the API server's proxy, which
+  the role allows only for the `oan-dashboards` Service.
+- **Residual risk:** any identity that can create workloads in a namespace can mount that
+  namespace's Secrets into a pod. Treat the farmer-ci kubeconfigs as having that reach.
+
+Check it:
 
 ```sh
-kubectl auth can-i create deployments -n commons --as=system:serviceaccount:far:farmer-ci             # yes
-kubectl auth can-i create gateways.networking.istio.io -n commons --as=system:serviceaccount:far:farmer-ci  # yes
+A=--as=system:serviceaccount:far:farmer-ci
+kubectl auth can-i create deployments -n commons $A                                   # yes
+kubectl auth can-i create gateways.networking.istio.io -n commons $A                  # yes
+kubectl auth can-i get services/oan-dashboards:http --subresource=proxy -n commons $A  # yes
+kubectl auth can-i list secrets -n commons $A                                         # no
+kubectl auth can-i create pods/exec -n commons $A                                     # no
 ```
+
+A server-side dry run of the chart as farmer-ci reports the two RoleBindings as `NotFound`. Only
+the dry run fails there: the RoleBinding check needs its Role, which a dry run never saves. A real
+install creates the Roles first.
 
 ### Public hostname (once per environment)
 
@@ -204,10 +230,11 @@ ingress. For a new hostname:
 
 | Symptom | Likely cause | Action |
 | --- | --- | --- |
-| Deploy stage: `forbidden` in `commons` | `commons-deploy-rbac.yaml` not applied on that cluster | Apply it, then check with `auth can-i` as `far:farmer-ci` ([Deploy permission](#deploy-permission-once-per-cluster)) |
+| Deploy stage: `forbidden` in `commons` | `commons-deploy-rbac.yaml` not applied on that cluster, or the chart now uses an object type the role does not list | Apply it, then check with `auth can-i` as `far:farmer-ci` ([Deploy permission](#deploy-permission-once-per-cluster)). A new object type in the chart needs a rule in the role first |
+| `helm` lists no release, or tries to install over an existing one | Helm run without `HELM_DRIVER=configmap` | Always set `HELM_DRIVER=configmap` for this release |
 | Deploy stage: hook `oan-dashboards-ecr-refresh-init` failed | The node's IAM role cannot get an ECR token, or Docker Hub images cannot be pulled | `kubectl -n commons logs job/oan-dashboards-ecr-refresh-init --all-containers` |
 | Pod `ImagePullBackOff` | `oan-dashboards-ecr` missing or expired, or the image is missing from ECR | `kubectl -n commons get secret oan-dashboards-ecr`; `kubectl -n commons create job --from=cronjob/oan-dashboards-ecr-refresh ecr-refresh-now`; check the tag exists |
-| Smoke test: `charts failed: … No data` or `refresh failed` | The dashboards cannot reach the farmer registry dashboard service | `kubectl -n far get deploy farmer-registry-dashboard-api`; from the pod, `node -e "fetch('http://farmer-registry-dashboard-api.far/health').then(r=>console.log(r.status))"` |
+| Smoke test: `charts failed: … No data` or `refresh failed` | The dashboards cannot reach the farmer registry dashboard service | `kubectl -n far get deploy farmer-registry-dashboard-api`; `kubectl -n commons logs deploy/oan-dashboards` for `[dashboard-services] … refresh failed` lines |
 | Public URL: 404 from Istio | Gateway or VirtualService missing, or host mismatch | `kubectl -n commons get gateway,virtualservice`; the host must equal `ingress.public.host` |
 | Public URL: TLS error or nginx default page | nginx site or certificate missing | Complete [Public hostname](#public-hostname-once-per-environment) |
 | Filters empty | `/api/filter-options` failing | Check pod logs. Regions come from the bundled boundaries; record statuses come from the farmer registry service |

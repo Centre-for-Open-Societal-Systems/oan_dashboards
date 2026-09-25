@@ -13,10 +13,17 @@ pipeline {
         AWS_REGION     = "ap-south-1"
         ECR_REGISTRY   = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         ECR_REPOSITORY = "openg2p/oan-dashboards"
+        // A Docker login of this build's own: other pipelines on the same node run
+        // `docker logout` in their post steps, which would otherwise remove the
+        // shared login between this build's `docker login` and `docker push`.
+        DOCKER_CONFIG  = "${env.WORKSPACE}@tmp/docker-config"
 
         HELM_RELEASE   = "oan-dashboards"
         HELM_NAMESPACE = "commons"
         HELM_CHART_DIR = "helm/oan-dashboards"
+        // Release records in ConfigMaps: the deploy identity has no read access to
+        // Secrets in commons (deploy/k8s/commons-deploy-rbac.yaml).
+        HELM_DRIVER    = "configmap"
     }
 
     stages {
@@ -70,8 +77,9 @@ pipeline {
             // develop -> dev cluster, staging -> staging cluster; other branches only
             // build and push. Same credentials as the farmer registry deploy: each is
             // a kubeconfig for far:farmer-ci on that cluster, which
-            // deploy/k8s/commons-deploy-rbac.yaml lets deploy into commons. The
-            // release creates everything else it needs, including its ECR pull secret.
+            // deploy/k8s/commons-deploy-rbac.yaml lets deploy this release into
+            // commons and nothing more. The release creates everything else it
+            // needs, including its ECR pull secret.
             when {
                 beforeAgent true
                 anyOf {
@@ -105,10 +113,19 @@ EOF
                         kubectl rollout status deployment/${HELM_RELEASE} -n ${HELM_NAMESPACE} --timeout=180s
 
                         # Ready only means the server answers. Load real charts through
-                        # the Service, so a dashboards build that cannot reach the
-                        # registry dashboard services fails here, not for users.
+                        # the Service (API server proxy; the role allows only this
+                        # Service), so a dashboards build that cannot reach the registry
+                        # dashboard services fails here, not for users.
                         echo "=== oan-dashboards smoke test ==="
-                        kubectl exec -n ${HELM_NAMESPACE} deploy/${HELM_RELEASE} -- node -e "const base = 'http://${HELM_RELEASE}.${HELM_NAMESPACE}'; (async () => { const h = await fetch(base + '/api/health'); if (!h.ok) throw new Error('health ' + h.status); const r = await fetch(base + '/api/charts?charts=farmerKpis,farmersByRegion,farmersByZone,landTenureSplit,registryTrendByMonth'); const j = await r.json(); console.log(JSON.stringify(j.summary)); const bad = Object.values(j.data || {}).filter(c => !c.success).map(c => c.chartName + ': ' + c.error); if (!r.ok || bad.length) throw new Error('charts failed: ' + bad.join('; ')); })().catch(e => { console.error(e.message); process.exit(1); })"
+                        SVC=/api/v1/namespaces/${HELM_NAMESPACE}/services/${HELM_RELEASE}:http/proxy
+                        kubectl get --raw "\$SVC/api/health"; echo
+                        CHARTS=\$(kubectl get --raw "\$SVC/api/charts?charts=farmerKpis,farmersByRegion,farmersByZone,landTenureSplit,registryTrendByMonth")
+                        echo "\$CHARTS" | grep -o '"summary":{[^}]*}'
+                        if ! echo "\$CHARTS" | grep -q '"failed":0'; then
+                            echo "charts failed:"
+                            echo "\$CHARTS" | grep -o '"chartName":"[^"]*","success":false[^}]*' || true
+                            exit 1
+                        fi
                         echo "Deployed ${HELM_RELEASE} ${env.IMAGE_TAG} -> https://${PUBLIC_HOST}"
                     """
                 }
