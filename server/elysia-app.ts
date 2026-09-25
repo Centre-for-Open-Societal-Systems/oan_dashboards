@@ -7,6 +7,11 @@ import { CHART_QUERIES, ChartFilters } from '@/lib/chart-queries'
 import { pool, farmerPool } from '@/lib/database'
 import type { Context } from 'elysia'
 import { getServiceChart, serviceForChart } from './dashboard-services'
+import { getBoundaries } from './boundaries'
+
+// The transitional database backs the Catalogs, Access to Credit and DevOps
+// dashboards until they have dashboard services of their own.
+const transitionalDatabaseConfigured = () => Boolean(process.env.DATABASE_URL)
 
 const filterColumnMap = {
   region: { name: 'rp.region', type: 'integer' },
@@ -426,54 +431,68 @@ export function createElysiaApp(prefix = '/api') {
         }
       }
     })
+    // Which dashboards this deployment can serve. Registries are served by the
+    // registry dashboard services; the others still need the transitional
+    // database (DATABASE_URL) and are hidden without it.
+    .get('/config', () => ({
+      dashboards: transitionalDatabaseConfigured()
+        ? ['registries', 'catalogs', 'a2c', 'devops']
+        : ['registries'],
+      // The crop and livestock registry views still read transitional SQL.
+      registryViews: transitionalDatabaseConfigured(),
+    }))
+    // Filter options for the Registries sidebar. Geography comes from the map
+    // boundaries (the units the map draws, P-codes as ids) and record statuses
+    // from the farmer registry dashboard service, so the filters need no
+    // database here and always match the map and the charts.
     .get('/filter-options', async ({ set }) => {
       try {
-        const [regions, recordStatuses, farmerTypes] = await Promise.all([
-          dataService.getRegions(),
-          dataService.getRecordStatuses(),
-          dataService.getFarmerTypes(),
+        const [{ regions }, recordStatuses] = await Promise.all([
+          getBoundaries(),
+          getServiceChart('farmersByRecordState', {}).catch(error => {
+            console.warn('[filter-options] record statuses unavailable:', error instanceof Error ? error.message : error)
+            return []
+          }),
         ])
-        return { regions, recordStatuses, farmerTypes }
+        return {
+          regions: regions.map(r => ({ id: r.code, code: r.code, name: r.name })),
+          recordStatuses: recordStatuses.map(r => ({ status: String(r.record_state), count: Number(r.farmers) })),
+          // Not applied to registry charts; the sidebar hides an empty list.
+          farmerTypes: [],
+        }
       } catch (error: any) {
         console.error('API Error fetching filter options:', error)
         set.status = 500
-        return { message: 'Failed to fetch filter options', error: error instanceof Error ? error.message : 'Unknown error' }
+        return { message: 'Failed to fetch filter options' }
       }
     })
+    // Child units for the cascading geography filters. Ids are P-codes.
+    // Kebeles are not in the map boundaries, so they come from the farmer
+    // registry (kebeles that have registered farmers).
     .get('/locations', async ({ query, set }) => {
-      const regionIdOrCode = query.regionId as string | undefined
-      const zoneIdOrCode = query.zoneId as string | undefined
-      const woredaIdOrCode = query.woredaId as string | undefined
-
-      const resolveId = async (table: string, value: string) => {
-        if (!value) return null
-        if (!Number.isNaN(Number(value))) return Number(value)
-        const res = await pool.query(`SELECT id FROM ${table} WHERE code = $1`, [value])
-        return res.rows[0]?.id ?? null
+      const pick = (value: unknown) => {
+        const v = typeof value === 'string' ? value.trim().toUpperCase() : ''
+        return v && v !== 'ALL' ? v : null
       }
-
+      const region = pick(query.regionId)
+      const zone = pick(query.zoneId)
+      const woreda = pick(query.woredaId)
       try {
-        if (regionIdOrCode && regionIdOrCode !== 'all') {
-          const regionId = await resolveId('g2p_region', regionIdOrCode)
-          if (!regionId) return { zones: [] }
-          const zones = await pool.query('SELECT id,name,code FROM g2p_zone WHERE region = $1', [regionId])
-          return { zones: zones.rows }
+        const { zones, woredas } = await getBoundaries()
+        if (region) {
+          return { zones: zones.filter(z => z.region === region).map(z => ({ id: z.code, code: z.code, name: z.name })) }
         }
-
-        if (zoneIdOrCode && zoneIdOrCode !== 'all') {
-          const zoneId = await resolveId('g2p_zone', zoneIdOrCode)
-          if (!zoneId) return { woredas: [] }
-          const woredas = await pool.query('SELECT id,name,code FROM g2p_woreda WHERE zone = $1', [zoneId])
-          return { woredas: woredas.rows }
+        if (zone) {
+          return { woredas: woredas.filter(w => w.zone === zone).map(w => ({ id: w.code, code: w.code, name: w.name })) }
         }
-
-        if (woredaIdOrCode && woredaIdOrCode !== 'all') {
-          const woredaId = await resolveId('g2p_woreda', woredaIdOrCode)
-          if (!woredaId) return { kebeles: [] }
-          const kebeles = await pool.query('SELECT id,name,code FROM g2p_kebele WHERE woreda = $1', [woredaId])
-          return { kebeles: kebeles.rows }
+        if (woreda) {
+          const rows = await getServiceChart('farmersByKebele', { woreda })
+          return {
+            kebeles: rows
+              .map(r => ({ id: String(r.kebele_code), code: String(r.kebele_code), name: String(r.kebele) }))
+              .sort((a, b) => a.name.localeCompare(b.name)),
+          }
         }
-
         set.status = 400
         return { error: 'A valid query parameter (regionId, zoneId, or woredaId) is required.' }
       } catch (error: any) {

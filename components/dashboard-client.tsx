@@ -13,6 +13,7 @@ import {
 } from "@/hooks/use-a2c-filters"
 import dynamic from "next/dynamic"
 import { DashboardSectionSkeleton } from "@/components/ui/dashboard-skeleton"
+import { useDeploymentConfig } from "@/hooks/use-deployment-config"
 
 export default function DashboardClient({ 
   geoJsonData, 
@@ -42,6 +43,7 @@ export default function DashboardClient({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen)
 
+  const deploymentConfig = useDeploymentConfig()
   const [dashboardType, setDashboardType] = useState<DashboardType>('registries')
   const isCatalogs = dashboardType === 'catalogs'
   const isA2C = dashboardType === 'a2c'
@@ -55,7 +57,8 @@ export default function DashboardClient({
 
   // Crop and livestock farming swap the overview for a dedicated registry view.
   const registryView: 'crop' | 'livestock' | null =
-    !isRegistries ? null : filters.farmingType === 'crop' ? 'crop' : filters.farmingType === 'livestock' ? 'livestock' : null
+    !isRegistries || !deploymentConfig.registryViews ? null
+      : filters.farmingType === 'crop' ? 'crop' : filters.farmingType === 'livestock' ? 'livestock' : null
   const [regionsLookup, setRegionsLookup] = useState<Map<string, { name: string; id: number }>>(new Map())
   const [zonesLookup, setZonesLookup] = useState<Map<string, { name: string; id: number; regionId?: number }>>(new Map())
   const [woredasLookup, setWoredasLookup] = useState<Map<string, { name: string; id: number; zoneId?: number }>>(new Map())
@@ -409,6 +412,7 @@ export default function DashboardClient({
               onSidebarToggle={toggleSidebar}
               dashboardType={dashboardType}
               onDashboardTypeChange={setDashboardType}
+              availableDashboards={deploymentConfig.dashboards}
               a2cFilters={a2cFilters}
               onA2CFiltersChange={setA2CFilters}
             />
