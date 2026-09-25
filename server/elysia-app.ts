@@ -6,7 +6,7 @@ import { validateFilters, ChartFilters as ServiceChartFilters } from '@/lib/char
 import { CHART_QUERIES, ChartFilters } from '@/lib/chart-queries'
 import { pool, farmerPool } from '@/lib/database'
 import type { Context } from 'elysia'
-import { getRegistryChart, isRegistryChart } from './registry-cache'
+import { getServiceChart, serviceForChart } from './dashboard-services'
 
 const filterColumnMap = {
   region: { name: 'rp.region', type: 'integer' },
@@ -74,9 +74,9 @@ function buildWhereClause(filters: ChartFilters, overrides?: FilterOverrides, us
 }
 
 // P-code → g2p id conversion only matters for local SQL charts; skip the
-// lookups for a batch that is served entirely by the dashboard API.
+// lookups for a batch that is served entirely by dashboard services.
 async function convertFiltersFor(chartNames: string[], filters: any) {
-  return chartNames.every(isRegistryChart) ? filters : convertPcodsToIds(filters)
+  return chartNames.every(chart => serviceForChart(chart)) ? filters : convertPcodsToIds(filters)
 }
 
 async function convertPcodsToIds(filters: any) {
@@ -216,10 +216,11 @@ async function executeChartQuery(chartName: string, filters: ChartFilters, conve
   let result: any
 
   try {
-    // GEN2 registry charts come from farmer-registry-dashboard-api, through a
-    // 15-minute cache (server/registry-cache.ts).
-    if (isRegistryChart(chartName)) {
-      const rows = await getRegistryChart(chartName, filters)
+    // Registry charts come from their registry's dashboard service, through a
+    // shared cache (server/dashboard-services.ts). Local SQL below is the
+    // transitional path for charts no service serves yet.
+    if (serviceForChart(chartName)) {
+      const rows = await getServiceChart(chartName, filters)
       const executionTime = Math.round(performance.now() - startTime)
       return { chartName, success: true, data: rows, error: null, executionTime }
     }
