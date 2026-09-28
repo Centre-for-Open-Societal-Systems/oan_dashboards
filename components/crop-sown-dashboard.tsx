@@ -37,7 +37,7 @@ import {
   RegistryFilters,
   buildTrend,
   monthLabel,
-  tenureLabel,
+  ownershipKind,
   toNumber,
   useRegistryTrend,
 } from "@/components/registry/registry-data"
@@ -48,8 +48,8 @@ const CHART_NAMES = [
   "cropAreaByCrop",
   "cropAreaByRegion",
   "cropTopWoredas",
-  "landTenureSplit",
-  "registryTrendByMonth",
+  "cropLandTenureSplit",
+  "cropTrendByMonth",
 ]
 
 // Module scope keeps the reference stable so the map's drill-down effect doesn't loop.
@@ -87,7 +87,7 @@ export function CropSownDashboard({
   const woredasReporting = toNumber(kpis?.woredas_reporting)
   const ownedShare = totalArea > 0 ? (ownedArea / totalArea) * 100 : 0
 
-  const trend = useRegistryTrend(charts.registryTrendByMonth)
+  const trend = useRegistryTrend(charts.cropTrendByMonth)
 
   // Panels are height-capped in the band grid, so the longest tails are trimmed
   // rather than allowed to overflow their card.
@@ -121,15 +121,18 @@ export function CropSownDashboard({
 
   const tenureSegments = useMemo(
     () =>
-      (charts.landTenureSplit || [])
-        .map((row: any) => ({
-          name: tenureLabel(row.ownership_type),
-          value: toNumber(row.parcels),
-          color: TENURE_COLORS[tenureLabel(row.ownership_type)] || BRIGHT.violet,
-          sub: `${formatCompact(toNumber(row.area))} ha`,
-        }))
+      (charts.cropLandTenureSplit || [])
+        .map((row: any) => {
+          const kind = ownershipKind(row.ownership_type_code)
+          return {
+            name: String(row.ownership_type || kind || "Unknown"),
+            value: toNumber(row.parcels),
+            color: (kind && TENURE_COLORS[kind]) || BRIGHT.violet,
+            sub: `${formatCompact(toNumber(row.area))} ha`,
+          }
+        })
         .filter((segment: { value: number }) => segment.value > 0),
-    [charts.landTenureSplit]
+    [charts.cropLandTenureSplit]
   )
 
   const tenureParcels = tenureSegments.reduce((acc: number, segment: { value: number }) => acc + segment.value, 0)
@@ -380,13 +383,20 @@ export function CropSownDashboard({
       >
         <Sprout className="h-3.5 w-3.5 flex-none" style={{ color: BRIGHT.green }} />
         <span className="min-w-0 flex-1 truncate">
-          Boundaries: geoBoundaries gbOpen ETH ADM1/ADM3 (CC BY 4.0). Figures reflect registered farmer profiles for the
-          selected filters.
+          Boundaries: geoBoundaries gbOpen ETH ADM1/ADM3 (CC BY 4.0). Figures come from the Crop Sown Registry&apos;s active
+          sowing records for the selected filters.
         </span>
         <ExportDataButton
-          filters={filters}
           filePrefix="crop-sown-registry"
           captureTargetId="tab-content-crop-registry"
+          csvSections={() => [
+            { name: "Headline figures", rows: charts.cropKpis || [] },
+            { name: "Hectares sown by region", rows: charts.cropAreaByRegion || [] },
+            { name: "Area sown by crop", rows: charts.cropAreaByCrop || [] },
+            { name: "Land tenure of sown plots", rows: charts.cropLandTenureSplit || [] },
+            { name: "Top producing woredas", rows: charts.cropTopWoredas || [] },
+            { name: "Sowing by month", rows: charts.cropTrendByMonth || [] },
+          ]}
         />
       </div>
     </div>

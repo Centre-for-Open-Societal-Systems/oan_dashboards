@@ -57,8 +57,10 @@ export default function DashboardClient({
 
   // Crop and livestock farming swap the overview for a dedicated registry view.
   const registryView: 'crop' | 'livestock' | null =
-    !isRegistries || !deploymentConfig.registryViews ? null
-      : filters.farmingType === 'crop' ? 'crop' : filters.farmingType === 'livestock' ? 'livestock' : null
+    !isRegistries ? null
+      : filters.farmingType === 'crop' && deploymentConfig.registryViews.crop ? 'crop'
+      : filters.farmingType === 'livestock' && deploymentConfig.registryViews.livestock ? 'livestock'
+      : null
   const [regionsLookup, setRegionsLookup] = useState<Map<string, { name: string; id: number }>>(new Map())
   const [zonesLookup, setZonesLookup] = useState<Map<string, { name: string; id: number; regionId?: number }>>(new Map())
   const [woredasLookup, setWoredasLookup] = useState<Map<string, { name: string; id: number; zoneId?: number }>>(new Map())

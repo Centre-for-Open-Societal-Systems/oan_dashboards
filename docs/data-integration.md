@@ -26,7 +26,6 @@ Each group below moves to its registry's dashboard service as that service becom
 | Group | Chart IDs | Current source |
 | --- | --- | --- |
 | Farmer registry panels not yet on the service | `landStats`, `landAreaByRegion`, `demographyStats`, `socioEconomicKpis`, `recentRegistrations`, `householdIncomeSources` | `res_partner` and related `g2p_*` tables |
-| Crop and livestock registry panels | `crop*`, `livestock*` | crop and livestock tables |
 | Catalogs | `catalog*` | `crop_catalog`, `crop_variety`, `livestock_*`, `seed_*`, location catalogue |
 | Access to Credit | `a2c*` | `a2c_*` tables, through the `A2C_SCOPE` views |
 | DevOps | `devops*` | `devops_*` tables |
@@ -51,7 +50,9 @@ The UI sends filters as query parameters on `/api/charts`:
 ### Dashboard service charts
 
 Each service receives only the filters listed in its `filters` entry, unchanged. For the farmer
-registry these are `region`, `zone`, `woreda`, `kebele`, `farmingType` and `recordState`. Each
+registry these are `region`, `zone`, `woreda`, `kebele`, `farmingType` and `recordState`; the
+livestock and crop sown services take the same set without `farmingType`, which on those views only
+selects the view. Each
 service documents how it applies them; the farmer registry service, for example, counts only active
 records when `recordState` is absent. Filters a service does not accept are not forwarded, so they
 do not split the cache.

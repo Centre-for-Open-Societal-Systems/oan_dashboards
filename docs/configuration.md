@@ -22,12 +22,15 @@ reads its base URL from its own variable.
 
 | Variable | Service | Example |
 | --- | --- | --- |
-| `FARMER_REGISTRY_DASHBOARD_API_URL` | Farmer registry | `http://farmer-registry-dashboard-api:8000` (in-cluster) |
+| `FARMER_REGISTRY_DASHBOARD_API_URL` | Farmer registry | `http://farmer-registry-dashboard-api.far` (in-cluster) |
+| `LIVESTOCK_REGISTRY_DASHBOARD_API_URL` | Livestock registry | `http://livestock-registry-dashboard-api.live` (in-cluster) |
+| `CROPSOWN_REGISTRY_DASHBOARD_API_URL` | Crop sown registry | `http://cropsown-registry-dashboard-api.crop` (in-cluster) |
 | *one variable per additional registry service* | as declared in `DASHBOARD_SERVICES` | |
 
 - The URL must be reachable from the dashboards server. It is not used by browsers.
 - If a service's variable is not set, its charts report an error and the rest of the dashboards
-  keep working.
+  keep working. The crop and livestock views are offered only when their service's variable is set;
+  otherwise the Farming Type filter keeps the overview.
 
 | Variable | Default | Description |
 | --- | --- | --- |
@@ -35,10 +38,9 @@ reads its base URL from its own variable.
 
 ## Transitional: direct database access
 
-These are needed only while the Catalogs, Access to Credit and DevOps dashboards (and the crop and
-livestock registry views) have no dashboard service yet. **Leave `DATABASE_URL` unset to run with
-registry data only:** `/api/config` then offers only the Registries dashboard, the crop and livestock
-views stay on the overview, and nothing tries to reach a database.
+These are needed only while the Catalogs, Access to Credit and DevOps dashboards have no dashboard
+service yet. **Leave `DATABASE_URL` unset to run with registry data only:** `/api/config` then
+offers only the Registries dashboard, and nothing tries to reach a database.
 
 | Variable | Description |
 | --- | --- |

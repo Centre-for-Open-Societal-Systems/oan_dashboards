@@ -5,7 +5,7 @@
 // no scrolling, using the same band grid and panel density as the landing overview.
 
 import { useMemo } from "react"
-import { Home, Layers, MapPinned, Milk, UserRound, Users } from "lucide-react"
+import { Beef, Home, Layers, MapPinned, UserRound, Users } from "lucide-react"
 import {
   Area,
   AreaChart,
@@ -35,8 +35,8 @@ import {
 import {
   RegistryFilters,
   buildTrend,
+  herdHealthLabel,
   monthLabel,
-  tenureLabel,
   toNumber,
   useRegistryTrend,
 } from "@/components/registry/registry-data"
@@ -45,16 +45,24 @@ import { ExportDataButton } from "@/components/registry/export-button"
 const CHART_NAMES = [
   "livestockKpis",
   "livestockBySpecies",
-  "farmersByRegion",
+  "livestockKeepersByRegion",
   "livestockTopWoredas",
-  "landTenureSplit",
-  "registryTrendByMonth",
+  "herdHealthSplit",
+  "livestockTrendByMonth",
 ]
 
-const TENURE_COLORS: Record<string, string> = {
-  Owner: BRIGHT.green,
-  Tenant: BRIGHT.amber,
-  "Crop share": BRIGHT.tealSoft,
+// Module scope keeps the reference stable so the map's drill-down effect doesn't loop.
+const LIVESTOCK_CHILD_CHARTS = {
+  zones: "livestockKeepersByZone",
+  woredas: "livestockKeepersByWoreda",
+  kebeles: "livestockKeepersByKebele",
+}
+
+const HEALTH_COLORS: Record<string, string> = {
+  Healthy: BRIGHT.green,
+  Sick: BRIGHT.amber,
+  Quarantined: BRIGHT.violet,
+  Deceased: REGISTRY_COLORS.red,
   Unknown: "#94A3B8",
 }
 
@@ -71,39 +79,36 @@ export function LivestockDashboard({
   const charts = data?.data || {}
 
   const kpis = charts.livestockKpis?.[0] || null
-  const farmers = toNumber(kpis?.farmers)
-  const households = toNumber(kpis?.households)
-  const femaleFarmers = toNumber(kpis?.female_farmers)
+  const keepers = toNumber(kpis?.keepers)
+  const holdings = toNumber(kpis?.holdings)
+  const femaleKeepers = toNumber(kpis?.female_keepers)
+  const animals = toNumber(kpis?.animals)
   const speciesTracked = toNumber(kpis?.species_tracked)
   const breedsTracked = toNumber(kpis?.breeds_tracked)
-  const totalArea = toNumber(kpis?.total_area)
   const woredasReporting = toNumber(kpis?.woredas_reporting)
-  const femaleShare = farmers > 0 ? (femaleFarmers / farmers) * 100 : 0
+  const femaleShare = keepers > 0 ? (femaleKeepers / keepers) * 100 : 0
 
-  const trend = useRegistryTrend(charts.registryTrendByMonth)
-
-  const speciesRows = charts.livestockBySpecies || []
-  const censusYear = speciesRows[0]?.census_year
+  const trend = useRegistryTrend(charts.livestockTrendByMonth)
 
   // Panels are height-capped in the band grid, so the longest tails are trimmed
   // rather than allowed to overflow their card.
   const speciesItems = useMemo(
     () =>
-      speciesRows.slice(0, 7).map((row: any) => ({
+      (charts.livestockBySpecies || []).slice(0, 7).map((row: any) => ({
         name: row.species,
-        value: toNumber(row.population),
+        value: toNumber(row.animals),
       })),
-    [speciesRows]
+    [charts.livestockBySpecies]
   )
 
-  const farmersByRegion = useMemo(
+  const keepersByRegion = useMemo(
     () =>
-      (charts.farmersByRegion || []).map((row: any) => ({
+      (charts.livestockKeepersByRegion || []).map((row: any) => ({
         region: row.region,
         region_code: row.region_code,
         farmers: toNumber(row.farmers),
       })),
-    [charts.farmersByRegion]
+    [charts.livestockKeepersByRegion]
   )
 
   const topWoredas = useMemo(
@@ -115,20 +120,23 @@ export function LivestockDashboard({
     [charts.livestockTopWoredas]
   )
 
-  const tenureSegments = useMemo(
-    () =>
-      (charts.landTenureSplit || [])
-        .map((row: any) => ({
-          name: tenureLabel(row.ownership_type),
-          value: toNumber(row.parcels),
-          color: TENURE_COLORS[tenureLabel(row.ownership_type)] || BRIGHT.violet,
-          sub: `${formatCompact(toNumber(row.area))} ha`,
-        }))
-        .filter((segment: { value: number }) => segment.value > 0),
-    [charts.landTenureSplit]
-  )
+  const healthSegments = useMemo(() => {
+    const total = (charts.herdHealthSplit || []).reduce((acc: number, row: any) => acc + toNumber(row.animals), 0)
+    return (charts.herdHealthSplit || [])
+      .map((row: any) => {
+        const name = herdHealthLabel(row.health_status)
+        const value = toNumber(row.animals)
+        return {
+          name,
+          value,
+          color: HEALTH_COLORS[name] || BRIGHT.tealSoft,
+          sub: total > 0 ? `${((value / total) * 100).toFixed(1)}%` : undefined,
+        }
+      })
+      .filter((segment: { value: number }) => segment.value > 0)
+  }, [charts.herdHealthSplit])
 
-  const tenureParcels = tenureSegments.reduce((acc: number, segment: { value: number }) => acc + segment.value, 0)
+  const healthAnimals = healthSegments.reduce((acc: number, segment: { value: number }) => acc + segment.value, 0)
 
   // Cumulative registrations reproduce the reference dashboard's climbing area curve.
   const registrationSeries = useMemo(() => {
@@ -141,8 +149,7 @@ export function LivestockDashboard({
 
   const recentRegistrations = useMemo(() => registrationSeries.slice(-12), [registrationSeries])
 
-  const farmerTrend = buildTrend(trend.series, "farmers", { cumulative: true })
-  const areaTrend = buildTrend(trend.series, "totalArea", { cumulative: true })
+  const keeperTrend = buildTrend(trend.series, "farmers", { cumulative: true })
 
   if (error) {
     return (
@@ -173,9 +180,9 @@ export function LivestockDashboard({
           iconBg={BRIGHT_SOFT.blue}
           iconColor={BRIGHT.blue}
           tint="blue"
-          value={formatFull(farmers)}
+          value={formatFull(keepers)}
           label="Livestock Keepers"
-          delta={farmerTrend.delta}
+          delta={keeperTrend.delta}
           loading={loading}
         />
         <RegistryStat
@@ -183,9 +190,9 @@ export function LivestockDashboard({
           iconBg={BRIGHT_SOFT.green}
           iconColor={BRIGHT.green}
           tint="green"
-          value={formatFull(households)}
-          label="Households"
-          note={farmers > 0 ? `${((households / farmers) * 100).toFixed(1)}% of keepers` : undefined}
+          value={formatFull(holdings)}
+          label="Holdings"
+          note={keepers > 0 ? `${(holdings / keepers).toFixed(1)} per keeper` : undefined}
           loading={loading}
         />
         <RegistryStat
@@ -199,14 +206,13 @@ export function LivestockDashboard({
           loading={loading}
         />
         <RegistryStat
-          icon={<MapPinned className="h-7 w-7" strokeWidth={2.5} />}
+          icon={<Beef className="h-7 w-7" strokeWidth={2.5} />}
           iconBg={BRIGHT_SOFT.violet}
           iconColor={BRIGHT.violet}
           tint="violet"
-          value={formatCompact(totalArea)}
-          unit="ha"
-          label="Holding Land"
-          delta={areaTrend.delta}
+          value={formatCompact(animals)}
+          label="Animals"
+          note="head count"
           loading={loading}
         />
         <RegistryStat
@@ -216,11 +222,11 @@ export function LivestockDashboard({
           tint="pink"
           value={`${femaleShare.toFixed(1)}%`}
           label="Women Keepers"
-          note={`${formatFull(femaleFarmers)} keepers`}
+          note={`${formatFull(femaleKeepers)} keepers`}
           loading={loading}
         />
         <RegistryStat
-          icon={<Milk className="h-7 w-7" strokeWidth={2.5} />}
+          icon={<MapPinned className="h-7 w-7" strokeWidth={2.5} />}
           iconBg={BRIGHT_SOFT.amber}
           iconColor={BRIGHT.amber}
           tint="amber"
@@ -231,7 +237,7 @@ export function LivestockDashboard({
         />
       </section>
 
-      {/* Band 2 — map, species mix, tenure */}
+      {/* Band 2 — map, species mix, herd health */}
       <section className="grid min-h-0 flex-none grid-cols-1 gap-3 @[720px]:grid-cols-2 @[860px]:grid-cols-[2.6fr_1.75fr_1.55fr]">
         <RegistryCard
           dense
@@ -253,6 +259,7 @@ export function LivestockDashboard({
             popOutTitle="Livestock Keepers by Region"
             valueLabel="keepers"
             valueFormatter={(value: number) => formatCompact(value)}
+            childChartKeys={LIVESTOCK_CHILD_CHARTS}
             currentFilters={{
               region: filters.region !== "all" ? filters.region : undefined,
               zone: filters.zone !== "all" ? filters.zone : undefined,
@@ -260,7 +267,7 @@ export function LivestockDashboard({
               farmingType: filters.farmingType !== "all" ? filters.farmingType : undefined,
             }}
             onFilterChange={(mapFilters: any) => onMapFilterChange?.(mapFilters)}
-            farmerData={farmersByRegion}
+            farmerData={keepersByRegion}
             geoJsonData={geoJsonData}
           />
         </RegistryCard>
@@ -268,7 +275,7 @@ export function LivestockDashboard({
         <RegistryCard
           dense
           title="Livestock by Species"
-          subtitle={censusYear ? `National herd, ${censusYear} census` : "National herd"}
+          subtitle="Registered head count"
           className="flex min-h-[220px] flex-col overflow-hidden @[860px]:min-h-0"
           bodyClassName="flex min-h-0 flex-1 flex-col"
         >
@@ -277,25 +284,25 @@ export function LivestockDashboard({
             items={speciesItems}
             unitLabel="Number of animals"
             formatter={(value) => formatCompact(value)}
-            emptyMessage="Species census unavailable"
+            emptyMessage="No animals registered"
           />
         </RegistryCard>
 
         <RegistryCard
           dense
-          title="Holding Tenure"
-          subtitle="Holdings by ownership type"
+          title="Herd Health"
+          subtitle="Animals by health status"
           className="flex min-h-[220px] flex-col overflow-hidden @[860px]:min-h-0"
           bodyClassName="flex min-h-0 flex-1 items-center"
         >
           <RegistryDonut
             ringSize={96}
             className="w-full"
-            segments={tenureSegments}
-            centerValue={formatCompact(tenureParcels)}
-            centerLabel="Holdings"
+            segments={healthSegments}
+            centerValue={formatCompact(healthAnimals)}
+            centerLabel="Animals"
             totalLabel="Total"
-            totalValue={`${formatFull(tenureParcels)} holdings`}
+            totalValue={`${formatFull(healthAnimals)} animals`}
           />
         </RegistryCard>
       </section>
@@ -315,7 +322,7 @@ export function LivestockDashboard({
           dense
           title="Registrations Over Time"
           subtitle="Cumulative registered livestock keepers"
-          actions={farmerTrend.delta ? <DeltaChip delta={farmerTrend.delta} /> : undefined}
+          actions={keeperTrend.delta ? <DeltaChip delta={keeperTrend.delta} /> : undefined}
           className="flex min-h-[220px] flex-col overflow-hidden @[860px]:min-h-0"
           bodyClassName="min-h-0 flex-1 px-1 pb-1 pt-1"
         >
@@ -377,13 +384,20 @@ export function LivestockDashboard({
       >
         <Layers className="h-3.5 w-3.5 flex-none" style={{ color: BRIGHT.teal }} />
         <span className="min-w-0 flex-1 truncate">
-          Boundaries: geoBoundaries gbOpen ETH ADM1/ADM3 (CC BY 4.0). Species totals come from the national livestock
-          census and are not filtered by area.
+          Boundaries: geoBoundaries gbOpen ETH ADM1/ADM3 (CC BY 4.0). Figures come from the Livestock Registry&apos;s active
+          holdings for the selected filters; flocks and hives count every head.
         </span>
         <ExportDataButton
-          filters={filters}
           filePrefix="livestock-registry"
           captureTargetId="tab-content-livestock-registry"
+          csvSections={() => [
+            { name: "Headline figures", rows: charts.livestockKpis || [] },
+            { name: "Livestock keepers by region", rows: charts.livestockKeepersByRegion || [] },
+            { name: "Livestock by species", rows: charts.livestockBySpecies || [] },
+            { name: "Herd health", rows: charts.herdHealthSplit || [] },
+            { name: "Top woredas", rows: charts.livestockTopWoredas || [] },
+            { name: "Registrations by month", rows: charts.livestockTrendByMonth || [] },
+          ]}
         />
       </div>
     </div>

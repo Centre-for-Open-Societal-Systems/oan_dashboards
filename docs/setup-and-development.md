@@ -13,13 +13,19 @@
 cp .env.example .env
 ```
 
-Set the URL of each dashboard service you run, for example
-`FARMER_REGISTRY_DASHBOARD_API_URL=http://localhost:8005`. `.env` is git-ignored: keep real values
+Set the URL of each dashboard service you run. With each service's own compose file these are
+`FARMER_REGISTRY_DASHBOARD_API_URL=http://localhost:8005`,
+`LIVESTOCK_REGISTRY_DASHBOARD_API_URL=http://localhost:8006` and
+`CROPSOWN_REGISTRY_DASHBOARD_API_URL=http://localhost:8007`. `.env` is git-ignored: keep real values
 there, and never in `.env.example`. See [Configuration](configuration.md).
 
 ## 2. Run the dashboard services
 
-Each registry's dashboard service runs from its own repository. For the farmer registry:
+Each registry's dashboard service runs from its own repository
+([farmer](https://github.com/Centre-for-Open-Societal-Systems/farmer-registry-dashboard-api),
+[livestock](https://github.com/Centre-for-Open-Societal-Systems/livestock-registry-dashbaord-api),
+[crop sown](https://github.com/Centre-for-Open-Societal-Systems/cropsown-registry-dashboard-api)),
+and each README describes its setup. For the farmer registry:
 
 ```bash
 # in farmer-registry-dashboard-api
@@ -28,7 +34,8 @@ docker compose up -d --build
 curl http://localhost:8005/health
 ```
 
-A service you do not run only affects its own charts. They show an error and a warning is logged.
+A service you do not run only affects its own charts. They show an error and a warning is logged,
+and without its URL the crop or livestock view is not offered.
 
 ## 3. Run the dashboards
 

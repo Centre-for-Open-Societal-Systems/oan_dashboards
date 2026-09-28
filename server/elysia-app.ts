@@ -6,7 +6,7 @@ import { validateFilters, ChartFilters as ServiceChartFilters } from '@/lib/char
 import { CHART_QUERIES, ChartFilters } from '@/lib/chart-queries'
 import { pool, farmerPool } from '@/lib/database'
 import type { Context } from 'elysia'
-import { getServiceChart, serviceForChart } from './dashboard-services'
+import { getServiceChart, serviceConfigured, serviceForChart } from './dashboard-services'
 import { getBoundaries } from './boundaries'
 
 // The transitional database backs the Catalogs, Access to Credit and DevOps
@@ -37,9 +37,7 @@ export function resolveFarmingTypeAliases(value: string): string[] {
   return FARMING_TYPE_ALIASES[key] || [key]
 }
 
-type FilterOverrides = Partial<Record<keyof ChartFilters, string>>
-
-function buildWhereClause(filters: ChartFilters, overrides?: FilterOverrides, usePCodes = false): { clause: string; values: any[] } {
+function buildWhereClause(filters: ChartFilters, usePCodes = false): { clause: string; values: any[] } {
   const conditions: string[] = []
   const values: any[] = []
   let paramIndex = 1
@@ -48,9 +46,8 @@ function buildWhereClause(filters: ChartFilters, overrides?: FilterOverrides, us
     if (value && value !== 'all') {
       const columnKey = key as keyof typeof filterColumnMap
       const column = filterColumnMap[columnKey]
-      const overrideName = overrides?.[columnKey]
       if (column) {
-        const columnName = overrideName || column.name
+        const columnName = column.name
         if (column.type === 'integer' && !usePCodes) {
           conditions.push(`${columnName} = $${paramIndex++}::integer`)
           values.push(value)
@@ -163,25 +160,10 @@ function buildA2CClauses(filters: ChartFilters): { geo: string; provider: string
   }
 }
 
-const chartFilterOverrides: Record<string, FilterOverrides> = {
-  cropAreaByWoreda: {
-    region: 'rp.region',
-    zone: 'rp.zone',
-    woreda: 'w.id',
-  },
-  cropAreaByKebele: {
-    region: 'rp.region',
-    zone: 'rp.zone',
-    woreda: 'w.id',
-    kebele: 'k.id',
-  },
-}
-
 // Resolves a chart's SQL and its bind values. Which filter dialect a query
 // speaks is decided by the placeholder it carries, so callers need not know
 // whether a chart is a registry, reference-data or A2C query.
 function prepareChartSql(
-  chartName: string,
   baseQuery: string,
   filters: ChartFilters,
   convertedFilters: ChartFilters
@@ -198,10 +180,9 @@ function prepareChartSql(
     return { sql: baseQuery, values: [] }
   }
 
-  const overrides = chartFilterOverrides[chartName] || undefined
   const isGen2 = baseQuery.includes('g2p_register_farmers')
   const filtersToUse = isGen2 ? filters : convertedFilters
-  const { clause, values } = buildWhereClause(filtersToUse, overrides, isGen2)
+  const { clause, values } = buildWhereClause(filtersToUse, isGen2)
   return { sql: baseQuery.replace(DYNAMIC_FILTERS, clause), values }
 }
 
@@ -225,7 +206,7 @@ async function executeChartQuery(chartName: string, filters: ChartFilters, conve
     }
 
     const filtersForQuery = convertedFilters || await convertPcodsToIds(filters)
-    const { sql, values } = prepareChartSql(chartName, baseQuery, filters, filtersForQuery)
+    const { sql, values } = prepareChartSql(baseQuery, filters, filtersForQuery)
 
     const activePool = baseQuery.includes('g2p_register_farmers') ? farmerPool : pool
     const { rows } = await activePool.query(sql, values)
@@ -438,8 +419,11 @@ export function createElysiaApp(prefix = '/api') {
       dashboards: transitionalDatabaseConfigured()
         ? ['registries', 'catalogs', 'a2c', 'devops']
         : ['registries'],
-      // The crop and livestock registry views still read transitional SQL.
-      registryViews: transitionalDatabaseConfigured(),
+      // Each dedicated registry view needs its registry dashboard service.
+      registryViews: {
+        crop: serviceConfigured('cropsown-registry'),
+        livestock: serviceConfigured('livestock-registry'),
+      },
     }))
     // Filter options for the Registries sidebar. Geography comes from the map
     // boundaries (the units the map draws, P-codes as ids) and record statuses

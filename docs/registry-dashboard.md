@@ -1,7 +1,7 @@
 # Registry dashboard
 
-The Registries dashboard presents live statistics from the OpenG2P farmer registry. This document
-covers:
+The Registries dashboard presents live statistics from the OpenG2P farmer registry, with dedicated
+livestock and crop sown views served by those registries. This document covers:
 
 - where the figures come from
 - the contract between the dashboard and the farmer registry's dashboard service
@@ -48,11 +48,34 @@ flowchart LR
 | `farmersByAgeAndGender` | Demographic profile, youth and elderly KPIs | `age_group, gender, farmers` | Bands `UNDER_25, 25_34, 35_49, 50_64, 65_PLUS, UNKNOWN`. The bands are registry policy, and the UI labels them |
 | `farmersByEducation` | Education profile | `education, farmers` | |
 | `farmersByRecordState` | Record status indicators | `record_state, farmers` | Covers every status |
-| `landTenureSplit` | Land tenure (overview, crop, livestock) | `ownership_type, parcels, area` | Per parcel, for the parcels of the farmers matching the filters (a parcel lying outside its owner's area still counts under the owner's). Codes: `OWNER`, `TENANT`, `CROP_SHARE`, labelled in the UI |
+| `landTenureSplit` | Land tenure (overview) | `ownership_type, parcels, area` | Per parcel, for the parcels of the farmers matching the filters (a parcel lying outside its owner's area still counts under the owner's). Codes: `OWNER`, `TENANT`, `CROP_SHARE`, labelled in the UI |
 | `registryTrendByMonth` | Registrations per month, registered vs owned area | `period (YYYY-MM), farmers, total_area, owned_area` | |
 | `farmersByPsnpStatus`, `farmersByImportStatus` | Indicator tiles | always `[]` | No registry equivalent yet |
 
 These chart IDs are declared for the `farmer-registry` entry of `DASHBOARD_SERVICES` in `server/dashboard-services.ts`.
+
+### Livestock and crop sown views
+
+Setting Farming Type to *Livestock* or *Crop* swaps the overview for a dedicated view. Every panel of
+those views comes from that registry's own dashboard service
+([livestock](https://github.com/Centre-for-Open-Societal-Systems/livestock-registry-dashbaord-api),
+[crop sown](https://github.com/Centre-for-Open-Societal-Systems/cropsown-registry-dashboard-api)),
+which reads the registry's `lr_rpt_*` or `cs_rpt_*` reporting views. The full contracts are in each
+service's `docs/api-reference.md`; the views use:
+
+| View | Chart IDs |
+| --- | --- |
+| Livestock | `livestockKpis`, `livestockKeepersByRegion` (map; drill-down `livestockKeepersByZone`, `…ByWoreda`, `…ByKebele`), `livestockBySpecies`, `herdHealthSplit`, `livestockTopWoredas`, `livestockTrendByMonth` |
+| Crop sown | `cropKpis`, `cropAreaByRegion` (map; drill-down `cropAreaByZone`, `…ByWoreda`, `…ByKebele`), `cropAreaByCrop`, `cropLandTenureSplit`, `cropTopWoredas`, `cropTrendByMonth` |
+
+- Livestock animal counts are head counts: a flock or a set of hives recorded as one line counts
+  every head.
+- The crop map colours by hectares sown. Its rows carry the hectares under `farmers`, the key the map
+  reads.
+- Their CSV export contains the aggregate panels on screen, never individual records.
+
+The other chart IDs these services serve (breeds, sex, vaccination, season, workflow states) are
+declared too, so panels can use them without further wiring.
 
 ### Codes and labels
 
@@ -61,6 +84,9 @@ The service returns registry **codes**. Labels are applied in one place,
 
 - `AGE_BANDS` and `ageBandLabel()` for age bands, for example `UNDER_25` → "Under 25"
 - `tenureLabel()` for tenure, for example `CROP_SHARE` → "Crop share"
+- `herdHealthLabel()` for animal health, for example `QUARANTINED` → "Quarantined"
+- `ownershipKind()` groups crop ownership keys (`OWNERSHIP_TYPE_OWNER`, …) for colouring; the
+  crop service already returns the registry's own label
 
 Components must not re-bucket codes. If the registry changes its bands, only the label map changes.
 
@@ -92,7 +118,7 @@ The sidebar filters map to service parameters as follows:
 
 | Layer | Default | Effect |
 | --- | --- | --- |
-| Registry view refresh | hourly (registry setting) | Figures reflect the register as of the last refresh |
+| Registry view refresh | hourly for the farmer registry, every 30 minutes for livestock and crop sown (registry settings) | Figures reflect the register as of the last refresh |
 | Dashboards service cache | 15 minutes (`DASHBOARD_CACHE_TTL_SECONDS`) | Each chart and filter combination is fetched from the service at most once per period for each server process |
 
 The worst-case lag between a change in the register and the dashboard is therefore the refresh
@@ -115,10 +141,9 @@ To force fresh figures, restart the dashboards server or wait one cache period.
 
 ## Known limitations
 
-- **Crop and livestock views.** Their crop and livestock indicators, land statistics and the Crop
-  view's map (hectares by zone and woreda) still query the transitional dashboard database. They show
-  seeded reference data until they move to a dashboard service. The overview is served entirely by
-  the farmer registry dashboard service.
+- **Farming Type on the overview.** On the overview, *Crop* and *Livestock* switch to the dedicated
+  view only when that registry's service is configured; otherwise the farmer overview stays, filtered
+  by farming type.
 - **Units the map cannot draw.** A few registry units are not in the map boundaries: special woredas
   whose hierarchy skips a level, and units created after the boundaries were published. They appear
   in the map's list view and the totals, but not as shapes.

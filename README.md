@@ -36,7 +36,8 @@ flowchart LR
 | Service | Status |
 | --- | --- |
 | Farmer registry dashboard service ([farmer-registry-dashboard-api](https://github.com/Centre-for-Open-Societal-Systems/farmer-registry-dashboard-api)) | In production use |
-| Other registries | Will follow the same pattern |
+| Livestock registry dashboard service ([livestock-registry-dashbaord-api](https://github.com/Centre-for-Open-Societal-Systems/livestock-registry-dashbaord-api)) | Serves the Livestock view |
+| Crop sown registry dashboard service ([cropsown-registry-dashboard-api](https://github.com/Centre-for-Open-Societal-Systems/cropsown-registry-dashboard-api)) | Serves the Crop view |
 
 Until then, their dashboards read a transitional dashboard database directly (see
 [Architecture](docs/architecture.md#transitional-direct-database-access)).

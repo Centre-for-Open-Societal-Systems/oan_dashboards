@@ -55,6 +55,31 @@ export function tenureLabel(value: unknown): string {
   return TENURE_LABELS[key] ?? key
 }
 
+// cropLandTenureSplit returns the registry's own label plus its lookup key
+// (OWNERSHIP_TYPE_OWNER, …); colour by the key so relabelling cannot recolour.
+export function ownershipKind(code: unknown): "Owner" | "Tenant" | "Crop share" | "Unknown" | null {
+  const key = String(code || "UNKNOWN").toUpperCase().replace(/^OWNERSHIP_TYPE_/, "")
+  if (key === "OWNER") return "Owner"
+  if (key === "TENANT") return "Tenant"
+  if (key.startsWith("CROP_SHAR")) return "Crop share"
+  if (key === "UNKNOWN") return "Unknown"
+  return null
+}
+
+// herdHealthSplit returns the livestock registry's health_status codes.
+const HERD_HEALTH_LABELS: Record<string, string> = {
+  HEALTHY: "Healthy",
+  SICK: "Sick",
+  QUARANTINED: "Quarantined",
+  DECEASED: "Deceased",
+  UNKNOWN: "Unknown",
+}
+
+export function herdHealthLabel(value: unknown): string {
+  const key = String(value || "UNKNOWN").toUpperCase()
+  return HERD_HEALTH_LABELS[key] ?? key
+}
+
 /** "2025-07" -> "Jul 2025" */
 export function monthLabel(period: string): string {
   const [year, month] = String(period || "").split("-")
