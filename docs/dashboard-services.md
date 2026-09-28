@@ -6,6 +6,14 @@ farmer registry's service,
 [farmer-registry-dashboard-api](https://github.com/Centre-for-Open-Societal-Systems/farmer-registry-dashboard-api),
 is the reference implementation.
 
+| Service | Repository | Namespace (Kubernetes) | Local port |
+| --- | --- | --- | --- |
+| `farmer-registry` | [farmer-registry-dashboard-api](https://github.com/Centre-for-Open-Societal-Systems/farmer-registry-dashboard-api) | `far` | 8005 |
+| `livestock-registry` | [livestock-registry-dashbaord-api](https://github.com/Centre-for-Open-Societal-Systems/livestock-registry-dashbaord-api) | `live` | 8006 |
+| `cropsown-registry` | [cropsown-registry-dashboard-api](https://github.com/Centre-for-Open-Societal-Systems/cropsown-registry-dashboard-api) | `crop` | 8007 |
+
+Each registry's Helm chart deploys its service next to the registry, as `<release>-dashboard-api`.
+
 ## Responsibilities
 
 A dashboard service:
@@ -64,7 +72,7 @@ Services are declared in `DASHBOARD_SERVICES` (`server/dashboard-services.ts`):
   id: 'livestock-registry',                       // cache keys and logs
   urlEnv: 'LIVESTOCK_REGISTRY_DASHBOARD_API_URL', // variable holding the base URL
   filters: [...GEO_FILTERS, 'recordState'],       // filters this service accepts
-  charts: ['livestockKpis', 'livestockBySpecies', 'livestockTopWoredas'],
+  charts: ['livestockKpis', 'livestockBySpecies', /* … */], // every chart ID it serves
 }
 ```
 
@@ -92,5 +100,6 @@ the warm-up logs a warning, but the rest of the dashboards keep working.
 | Warm-up | At start-up and every TTL, the unfiltered view of every chart of every configured service |
 | Load on a service | At most one call per chart and filter combination per TTL for each dashboards server process, independent of viewer count |
 
-Registries refresh their reporting views on their own schedule (hourly for the farmer registry).
+Registries refresh their reporting views on their own schedule (hourly for the farmer registry,
+every 30 minutes for livestock and crop sown).
 The worst-case lag of a figure is therefore that schedule plus one cache period.

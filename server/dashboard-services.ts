@@ -46,6 +46,28 @@ export const DASHBOARD_SERVICES: readonly DashboardService[] = [
       'farmersByImportStatus', 'farmersByPsnpStatus',
     ],
   },
+  {
+    id: 'livestock-registry',
+    urlEnv: 'LIVESTOCK_REGISTRY_DASHBOARD_API_URL',
+    filters: [...GEO_FILTERS, 'recordState'],
+    charts: [
+      'livestockKpis', 'livestockBySpecies', 'livestockByBreed',
+      'livestockKeepersByRegion', 'livestockKeepersByZone', 'livestockKeepersByWoreda', 'livestockKeepersByKebele',
+      'livestockTopWoredas', 'herdHealthSplit', 'livestockVaccinationStatus', 'livestockBySex',
+      'livestockTrendByMonth', 'livestockByState', 'livestockByRecordState',
+    ],
+  },
+  {
+    id: 'cropsown-registry',
+    urlEnv: 'CROPSOWN_REGISTRY_DASHBOARD_API_URL',
+    filters: [...GEO_FILTERS, 'recordState'],
+    charts: [
+      'cropKpis', 'cropAreaByCrop',
+      'cropAreaByRegion', 'cropAreaByZone', 'cropAreaByWoreda', 'cropAreaByKebele',
+      'cropTopWoredas', 'cropLandTenureSplit', 'cropBySeason', 'cropTrendByMonth',
+      'cropByStatus', 'cropByLifecycleStage', 'cropByRecordState',
+    ],
+  },
 ]
 
 const SERVICE_BY_CHART = new Map<string, DashboardService>(
@@ -102,6 +124,12 @@ const createCache = () => new LRUCache<string, Rows, FetchContext>({
 // Keep one per process on globalThis.
 const holder = globalThis as typeof globalThis & { __dashboardServiceCache?: ReturnType<typeof createCache> }
 const cache = (holder.__dashboardServiceCache ??= createCache())
+
+/** Whether the service with this id is declared and has its URL variable set. */
+export function serviceConfigured(id: string): boolean {
+  const service = DASHBOARD_SERVICES.find(s => s.id === id)
+  return service !== undefined && serviceUrl(service) !== undefined
+}
 
 /** The service that serves a chart, if any. Charts without one run local SQL. */
 export function serviceForChart(chartName: string): DashboardService | undefined {

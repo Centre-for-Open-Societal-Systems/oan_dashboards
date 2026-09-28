@@ -23,11 +23,15 @@ flowchart LR
     Istio -->|Gateway public-oanstaging<br/>VirtualService| Svc[commons/oan-dashboards]
     Svc --> Pod[oan-dashboards pod :3000]
     Pod -->|HTTP| FRS[far/farmer-registry-dashboard-api]
+    Pod -->|HTTP| LRS[live/livestock-registry-dashboard-api]
+    Pod -->|HTTP| CRS[crop/cropsown-registry-dashboard-api]
 ```
 
 - **Exposure.** Only the dashboards are public. The registry dashboard services stay `ClusterIP`,
-  and the dashboards call them server-to-server
-  (`FARMER_REGISTRY_DASHBOARD_API_URL=http://farmer-registry-dashboard-api.far`).
+  and the dashboards call them server-to-server, one URL variable per service
+  (`FARMER_REGISTRY_DASHBOARD_API_URL=http://farmer-registry-dashboard-api.far`, and likewise
+  `LIVESTOCK_…` in `live` and `CROPSOWN_…` in `crop`). Each registry's own pipeline deploys its
+  service.
 - **Transitional database.** Without `DATABASE_URL`, `/api/config` offers only the Registries
   dashboard. Catalogs, Access to Credit and DevOps stay hidden until they have dashboard services,
   or until the transitional database is provided.
@@ -50,7 +54,7 @@ the build context. The chart runs the container with a read-only root filesystem
 | Value | Default | Purpose |
 | --- | --- | --- |
 | `image.repository`, `image.tag` | — (required) | Set by CI |
-| `dashboardServices` | `FARMER_REGISTRY_DASHBOARD_API_URL: http://farmer-registry-dashboard-api.far` | One URL variable per registry dashboard service |
+| `dashboardServices` | the farmer (`.far`), livestock (`.live`) and crop sown (`.crop`) service URLs | One URL variable per registry dashboard service |
 | `cacheTtlSeconds` | `900` | `DASHBOARD_CACHE_TTL_SECONDS` |
 | `env`, `envFrom` | empty | Extra variables. Supply `DATABASE_URL` from a Secret via `envFrom` to enable the transitional dashboards |
 | `ingress.public` | disabled | `enabled`, `host`, `gatewayName` (default `public-oanstaging`). Creates a Gateway (port 8080, HTTP2, selector `istio: ingressgateway`) and a VirtualService for the host |
@@ -202,7 +206,9 @@ ingress. For a new hostname:
 
 ## First deploy checklist
 
-1. The farmer registry dashboard service is deployed in `far` (farmer-registry pipeline).
+1. The farmer registry dashboard service is deployed in `far` (farmer-registry pipeline). The
+   livestock (`live`) and crop sown (`crop`) services are deployed by their registries' pipelines;
+   until then only those two views are unavailable.
 2. `deploy/k8s/commons-deploy-rbac.yaml` is applied on the cluster.
 3. DNS, nginx and the certificate are set up for the public hostname.
 4. The `Jenkinsfile` is on `develop`. The next scan of the `OAN-Dashboard` folder creates the
@@ -235,6 +241,7 @@ ingress. For a new hostname:
 | Deploy stage: hook `oan-dashboards-ecr-refresh-init` failed | The node's IAM role cannot get an ECR token, or Docker Hub images cannot be pulled | `kubectl -n commons logs job/oan-dashboards-ecr-refresh-init --all-containers` |
 | Pod `ImagePullBackOff` | `oan-dashboards-ecr` missing or expired, or the image is missing from ECR | `kubectl -n commons get secret oan-dashboards-ecr`; `kubectl -n commons create job --from=cronjob/oan-dashboards-ecr-refresh ecr-refresh-now`; check the tag exists |
 | Smoke test: `charts failed: … No data` or `refresh failed` | The dashboards cannot reach the farmer registry dashboard service | `kubectl -n far get deploy farmer-registry-dashboard-api`; `kubectl -n commons logs deploy/oan-dashboards` for `[dashboard-services] … refresh failed` lines |
+| Crop or livestock view: "Failed to load registry data" | That registry's dashboard service is not deployed or not reachable | `kubectl -n live get deploy livestock-registry-dashboard-api` (or `-n crop … cropsown-registry-dashboard-api`); the same `[dashboard-services]` log lines name the service |
 | Public URL: 404 from Istio | Gateway or VirtualService missing, or host mismatch | `kubectl -n commons get gateway,virtualservice`; the host must equal `ingress.public.host` |
 | Public URL: TLS error or nginx default page | nginx site or certificate missing | Complete [Public hostname](#public-hostname-once-per-environment) |
 | Filters empty | `/api/filter-options` failing | Check pod logs. Regions come from the bundled boundaries; record statuses come from the farmer registry service |

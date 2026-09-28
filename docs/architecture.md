@@ -35,7 +35,7 @@ flowchart TB
 
     subgraph Private network
         FRS[Farmer registry dashboard service]
-        NS[Other registry dashboard services]
+        NS[Livestock and crop sown<br/>registry dashboard services]
     end
 
     TDB[(Transitional dashboard DB)]
@@ -104,7 +104,8 @@ dashboard service yet. For those chart IDs the BFF still runs parameterised SQL 
 Moving a chart to a service is described in [Data integration](data-integration.md).
 
 `GET /api/config` reports what a deployment can serve. Without `DATABASE_URL` it offers only the
-Registries dashboard and turns off the crop and livestock registry views. The sidebar and the
+Registries dashboard. The crop and livestock registry views are offered when their dashboard
+service's URL is set (`registryViews`). The sidebar and the
 dashboard switch follow it, so a deployment with registry data only never shows a dashboard it
 cannot fill.
 

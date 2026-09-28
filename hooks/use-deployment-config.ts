@@ -6,12 +6,12 @@ import type { DashboardType } from "@/components/global-filters-sidebar"
 /** What this deployment can serve (GET /api/config). */
 export interface DeploymentConfig {
   dashboards: DashboardType[]
-  /** Crop and livestock registry views (they still read the transitional database). */
-  registryViews: boolean
+  /** Dedicated registry views, each offered when its registry dashboard service is configured. */
+  registryViews: { crop: boolean; livestock: boolean }
 }
 
 // Until the config arrives, assume the minimum every deployment serves.
-const MINIMAL: DeploymentConfig = { dashboards: ["registries"], registryViews: false }
+const MINIMAL: DeploymentConfig = { dashboards: ["registries"], registryViews: { crop: false, livestock: false } }
 
 let request: Promise<DeploymentConfig> | null = null
 
