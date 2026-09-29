@@ -91,6 +91,10 @@ pipeline {
             environment {
                 KUBECONFIG_CREDENTIAL = "${env.BRANCH_NAME == 'staging' ? 'staging-farmer-kubeconfig' : 'gen2-dev-kubeconfig'}"
                 PUBLIC_HOST           = "${env.BRANCH_NAME == 'staging' ? 'oan-dashboard.oanstaging.com' : 'oan-dashboard-development.oanstaging.com'}"
+                // The A2C platform the Access to Credit dashboard reads (its public
+                // /api/v1/charts API). Empty hides that dashboard: staging has no A2C
+                // backend reachable from its cluster yet.
+                A2C_DASHBOARD_API_URL = "${env.BRANCH_NAME == 'staging' ? '' : 'https://a2c-backend-development.oanstaging.com'}"
             }
             steps {
                 unstash 'oan-chart'
@@ -105,6 +109,8 @@ ingress:
   public:
     enabled: true
     host: ${PUBLIC_HOST}
+dashboardServices:
+  A2C_DASHBOARD_API_URL: "${A2C_DASHBOARD_API_URL}"
 EOF
                         helm upgrade --install ${HELM_RELEASE} ${HELM_CHART_DIR} -n ${HELM_NAMESPACE} \
                             -f /tmp/values-oan-cicd-\${BUILD_NUMBER}.yaml --wait --timeout 10m
@@ -119,7 +125,9 @@ EOF
                         echo "=== oan-dashboards smoke test ==="
                         SVC=/api/v1/namespaces/${HELM_NAMESPACE}/services/${HELM_RELEASE}:http/proxy
                         kubectl get --raw "\$SVC/api/health"; echo
-                        CHARTS=\$(kubectl get --raw "\$SVC/api/charts?charts=farmerKpis,farmersByRegion,farmersByZone,landTenureSplit,registryTrendByMonth")
+                        SMOKE_CHARTS=farmerKpis,farmersByRegion,farmersByZone,landTenureSplit,registryTrendByMonth
+                        if [ -n "${A2C_DASHBOARD_API_URL}" ]; then SMOKE_CHARTS=\$SMOKE_CHARTS,a2cKpis,a2cFilterLocations; fi
+                        CHARTS=\$(kubectl get --raw "\$SVC/api/charts?charts=\$SMOKE_CHARTS")
                         echo "\$CHARTS" | grep -o '"summary":{[^}]*}'
                         if ! echo "\$CHARTS" | grep -q '"failed":0'; then
                             echo "charts failed:"
