@@ -26,6 +26,7 @@ reads its base URL from its own variable.
 | `LIVESTOCK_REGISTRY_DASHBOARD_API_URL` | Livestock registry | `http://livestock-registry-dashboard-api.live` (in-cluster) |
 | `CROPSOWN_REGISTRY_DASHBOARD_API_URL` | Crop sown registry | `http://cropsown-registry-dashboard-api.crop` (in-cluster) |
 | `A2C_DASHBOARD_API_URL` | Access to Credit, served by the A2C platform | `http://localhost:8000` (the A2C site's base URL) |
+| `A2C_DASHBOARD_API_CHARTS_PATH` | Path of the A2C charts under that URL. Default `/api/v1/charts`, which is how Frappe serves them. Set `/v1/charts` when the URL is A2C's Kong gateway, which exposes the REST API without the `/api` prefix | `/v1/charts` |
 | *one variable per additional registry service* | as declared in `DASHBOARD_SERVICES` | |
 
 - The URL must be reachable from the dashboards server. It is not used by browsers.

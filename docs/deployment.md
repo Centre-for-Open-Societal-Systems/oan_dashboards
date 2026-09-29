@@ -106,6 +106,11 @@ empty cache, so this proves the dashboards can reach the farmer registry dashboa
 The A2C backend must serve `/api/v1/charts` before the dashboards deploy that points at it, or the
 smoke test fails.
 
+To read A2C through its Kong gateway instead (for example `https://a2c-develop-gateway.oanstaging.com`),
+also set `A2C_DASHBOARD_API_CHARTS_PATH` to `/v1/charts`. The gateway's generated routes are `/v1/...`
+only and it adds the `/api` prefix upstream, while Frappe itself serves only `/api/v1/...`. The charts
+route is public in the gateway too, so no credentials are needed either way.
+
 ## Jenkins job
 
 The job is a **GitHub Organization Folder** at the top level of Jenkins, set up like the registry

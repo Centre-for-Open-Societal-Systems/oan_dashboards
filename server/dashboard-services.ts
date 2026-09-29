@@ -38,6 +38,11 @@ export interface DashboardService {
   id: string
   /** Environment variable holding the service's base URL. */
   urlEnv: string
+  /**
+   * Environment variable that may override the charts path (default `/api/v1/charts`),
+   * for a service reached through a gateway that exposes it under another prefix.
+   */
+  pathEnv?: string
   /** Filters the service accepts. Others are not forwarded, so they do not split the cache. */
   filters: readonly FilterName[]
   /** Chart IDs this service serves. */
@@ -90,6 +95,8 @@ export const DASHBOARD_SERVICES: readonly DashboardService[] = [
     // names rather than P-codes, so its adapter maps them onto the boundaries.
     id: 'a2c',
     urlEnv: 'A2C_DASHBOARD_API_URL',
+    // Frappe serves the charts under /api/v1; A2C's Kong gateway exposes them as /v1.
+    pathEnv: 'A2C_DASHBOARD_API_CHARTS_PATH',
     filters: ['provider', 'region', 'zone', 'woreda'],
     charts: [
       'a2cKpis', 'a2cProviders', 'a2cLocationSummary',
@@ -120,6 +127,14 @@ function serviceUrl(service: DashboardService): string | undefined {
   return value ? value.replace(/\/$/, '') : undefined
 }
 
+const DEFAULT_CHARTS_PATH = '/api/v1/charts'
+
+function chartsPath(service: DashboardService): string {
+  const value = service.pathEnv ? process.env[service.pathEnv]?.trim().replace(/\/+$/, '') : undefined
+  if (!value) return DEFAULT_CHARTS_PATH
+  return value.startsWith('/') ? value : `/${value}`
+}
+
 const createCache = () => new LRUCache<string, Rows, FetchContext>({
   max: 1000,
   ttl: DASHBOARD_CACHE_TTL_MS,
@@ -137,7 +152,8 @@ const createCache = () => new LRUCache<string, Rows, FetchContext>({
       if (!base) {
         throw new Error(`${service.urlEnv} is not set`)
       }
-      const call: ServiceCall = (serviceChart, query) => fetchRows(base, serviceChart, query)
+      const root = `${base}${chartsPath(service)}`
+      const call: ServiceCall = (serviceChart, query) => fetchRows(root, serviceChart, query)
       return service.adapter
         ? await service.adapter.rows(chartName, filters, call)
         : await call(chartName, params)
@@ -150,9 +166,9 @@ const createCache = () => new LRUCache<string, Rows, FetchContext>({
   },
 })
 
-async function fetchRows(base: string, chartName: string, params: Record<string, string>): Promise<Rows> {
+async function fetchRows(root: string, chartName: string, params: Record<string, string>): Promise<Rows> {
   const query = new URLSearchParams(params).toString()
-  const res = await fetch(`${base}/api/v1/charts/${encodeURIComponent(chartName)}${query ? `?${query}` : ''}`, { cache: 'no-store' })
+  const res = await fetch(`${root}/${encodeURIComponent(chartName)}${query ? `?${query}` : ''}`, { cache: 'no-store' })
   if (!res.ok) {
     throw new Error(`${chartName} returned ${res.status}`)
   }

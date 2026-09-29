@@ -72,6 +72,7 @@ Services are declared in `DASHBOARD_SERVICES` (`server/dashboard-services.ts`):
 {
   id: 'livestock-registry',                       // cache keys and logs
   urlEnv: 'LIVESTOCK_REGISTRY_DASHBOARD_API_URL', // variable holding the base URL
+  // pathEnv: 'X_CHARTS_PATH',                    // optional: variable overriding /api/v1/charts
   filters: [...GEO_FILTERS, 'recordState'],       // filters this service accepts
   charts: ['livestockKpis', 'livestockBySpecies', /* … */], // every chart ID it serves
 }
