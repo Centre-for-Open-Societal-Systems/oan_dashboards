@@ -92,7 +92,7 @@ See [Dashboard services](dashboard-services.md) for the contract and for adding 
 
 ## Transitional direct database access
 
-The Catalogs, Access to Credit and DevOps dashboards, and some Registries panels, do not have a
+The Catalogs and DevOps dashboards, and some Registries panels, do not have a
 dashboard service yet. For those chart IDs the BFF still runs parameterised SQL templates from
 `lib/chart-queries.ts` against a dashboard database (`DATABASE_URL`). This path:
 

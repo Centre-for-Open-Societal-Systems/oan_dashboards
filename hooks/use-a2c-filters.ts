@@ -2,9 +2,8 @@
 
 // A2C's filter contract and the option lists that back it.
 //
-// A2C is filtered by lender and by its own HDX P-code hierarchy, so it cannot
-// reuse the registry filters (those resolve to g2p ids). Enrolment stops at
-// woreda, hence no kebele level.
+// A2C is filtered by lender and by the places it actually reaches, so it cannot
+// reuse the registry filters. Its records stop at woreda, hence no kebele level.
 
 import { useEffect, useState } from "react"
 
@@ -72,7 +71,7 @@ async function fetchOptions(): Promise<A2COptions> {
   return { providers, locations }
 }
 
-// The option lists are sample reference data that never change within a session,
+// The option lists change only as lenders and farmers join, not within a session,
 // and both the sidebar dropdowns and the header's filter chips need them. One
 // shared promise keeps that to a single request.
 let cached: Promise<A2COptions> | null = null

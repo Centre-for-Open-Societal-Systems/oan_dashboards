@@ -25,12 +25,14 @@ reads its base URL from its own variable.
 | `FARMER_REGISTRY_DASHBOARD_API_URL` | Farmer registry | `http://farmer-registry-dashboard-api.far` (in-cluster) |
 | `LIVESTOCK_REGISTRY_DASHBOARD_API_URL` | Livestock registry | `http://livestock-registry-dashboard-api.live` (in-cluster) |
 | `CROPSOWN_REGISTRY_DASHBOARD_API_URL` | Crop sown registry | `http://cropsown-registry-dashboard-api.crop` (in-cluster) |
+| `A2C_DASHBOARD_API_URL` | Access to Credit, served by the A2C platform | `http://localhost:8000` (the A2C site's base URL) |
 | *one variable per additional registry service* | as declared in `DASHBOARD_SERVICES` | |
 
 - The URL must be reachable from the dashboards server. It is not used by browsers.
 - If a service's variable is not set, its charts report an error and the rest of the dashboards
   keep working. The crop and livestock views are offered only when their service's variable is set;
-  otherwise the Farming Type filter keeps the overview.
+  otherwise the Farming Type filter keeps the overview. The Access to Credit dashboard is offered
+  only when `A2C_DASHBOARD_API_URL` is set.
 
 | Variable | Default | Description |
 | --- | --- | --- |
@@ -38,7 +40,7 @@ reads its base URL from its own variable.
 
 ## Transitional: direct database access
 
-These are needed only while the Catalogs, Access to Credit and DevOps dashboards have no dashboard
+These are needed only while the Catalogs and DevOps dashboards have no dashboard
 service yet. **Leave `DATABASE_URL` unset to run with registry data only:** `/api/config` then
 offers only the Registries dashboard, and nothing tries to reach a database.
 

@@ -7,6 +7,11 @@
 //
 // Every service implements the same contract:
 //   GET <baseUrl>/api/v1/charts/<chartId>?<filters>  ->  JSON array of rows
+// A service may wrap the array in an envelope as `{ data: [...] }`.
+//
+// A service whose data does not line up with the dashboards one-to-one (other
+// filter values, a chart assembled from several of its own) declares an adapter
+// that translates in both directions.
 //
 // Service data is backed by reporting views refreshed on a schedule, so each
 // chart+filter combination is fetched at most once per TTL (default 15 min);
@@ -15,8 +20,18 @@
 import { LRUCache } from 'lru-cache'
 import type { ChartFilters } from '@/lib/chart-queries'
 import { generateCacheKey } from './cache'
+import { a2cAdapter } from './a2c-service'
 
 type FilterName = keyof ChartFilters
+export type Rows = Record<string, unknown>[]
+
+/** Calls the service for one of its own charts with the given query parameters. */
+export type ServiceCall = (serviceChart: string, params: Record<string, string>) => Promise<Rows>
+
+export interface ServiceAdapter {
+  /** Rows for a dashboard chart, given the dashboard's filters and a way to call the service. */
+  rows(chartName: string, filters: Partial<ChartFilters>, call: ServiceCall): Promise<Rows>
+}
 
 export interface DashboardService {
   /** Stable identifier, used in cache keys and logs. */
@@ -27,6 +42,8 @@ export interface DashboardService {
   filters: readonly FilterName[]
   /** Chart IDs this service serves. */
   charts: readonly string[]
+  /** Translation between the dashboards and the service, when they differ. */
+  adapter?: ServiceAdapter
 }
 
 const GEO_FILTERS = ['region', 'zone', 'woreda', 'kebele'] as const satisfies readonly FilterName[]
@@ -68,6 +85,21 @@ export const DASHBOARD_SERVICES: readonly DashboardService[] = [
       'cropByStatus', 'cropByLifecycleStage', 'cropByRecordState',
     ],
   },
+  {
+    // Access to Credit, served by the A2C platform itself. It keeps locations as
+    // names rather than P-codes, so its adapter maps them onto the boundaries.
+    id: 'a2c',
+    urlEnv: 'A2C_DASHBOARD_API_URL',
+    filters: ['provider', 'region', 'zone', 'woreda'],
+    charts: [
+      'a2cKpis', 'a2cProviders', 'a2cLocationSummary',
+      'a2cLoansByRegion', 'a2cLoansByZone', 'a2cLoansByWoreda', 'a2cLoansByKebele',
+      'a2cApplicationStatus', 'a2cConsentStatus', 'a2cLoanProducts', 'a2cLoanTrend',
+      'a2cDataShares', 'a2cDataShareFaults', 'a2cDeclineReasons',
+      'a2cFilterProviders', 'a2cFilterLocations',
+    ],
+    adapter: a2cAdapter,
+  },
 ]
 
 const SERVICE_BY_CHART = new Map<string, DashboardService>(
@@ -76,11 +108,11 @@ const SERVICE_BY_CHART = new Map<string, DashboardService>(
 
 export const DASHBOARD_CACHE_TTL_MS = Math.max(60, Number(process.env.DASHBOARD_CACHE_TTL_SECONDS) || 900) * 1000
 
-type Rows = Record<string, unknown>[]
 interface FetchContext {
   service: DashboardService
   chartName: string
-  query: string
+  filters: Partial<ChartFilters>
+  params: Record<string, string>
 }
 
 function serviceUrl(service: DashboardService): string | undefined {
@@ -99,17 +131,16 @@ const createCache = () => new LRUCache<string, Rows, FetchContext>({
   // Reads must not extend the TTL, or a popular key would never refresh.
   updateAgeOnGet: false,
   fetchMethod: async (_key, _stale, { context }) => {
-    const { service, chartName, query } = context
+    const { service, chartName, filters, params } = context
     try {
       const base = serviceUrl(service)
       if (!base) {
         throw new Error(`${service.urlEnv} is not set`)
       }
-      const res = await fetch(`${base}/api/v1/charts/${chartName}${query ? `?${query}` : ''}`, { cache: 'no-store' })
-      if (!res.ok) {
-        throw new Error(`returned ${res.status}`)
-      }
-      return (await res.json()) as Rows
+      const call: ServiceCall = (serviceChart, query) => fetchRows(base, serviceChart, query)
+      return service.adapter
+        ? await service.adapter.rows(chartName, filters, call)
+        : await call(chartName, params)
     } catch (error) {
       // Rethrown, not returned: a failure must never be cached as data. Logged
       // here because a failed background refresh is otherwise silent.
@@ -118,6 +149,19 @@ const createCache = () => new LRUCache<string, Rows, FetchContext>({
     }
   },
 })
+
+async function fetchRows(base: string, chartName: string, params: Record<string, string>): Promise<Rows> {
+  const query = new URLSearchParams(params).toString()
+  const res = await fetch(`${base}/api/v1/charts/${encodeURIComponent(chartName)}${query ? `?${query}` : ''}`, { cache: 'no-store' })
+  if (!res.ok) {
+    throw new Error(`${chartName} returned ${res.status}`)
+  }
+  const body: unknown = await res.json()
+  if (Array.isArray(body)) return body as Rows
+  const data = (body as { data?: unknown } | null)?.data
+  if (Array.isArray(data)) return data as Rows
+  throw new Error(`${chartName} returned no rows`)
+}
 
 // Next bundles instrumentation.ts (which warms the cache) separately from the
 // route handlers (which read it), so a module-level instance would exist twice.
@@ -156,7 +200,7 @@ export async function getServiceChart(
   }
   const params = serviceParams(service, filters)
   const rows = await cache.fetch(generateCacheKey(`${service.id}:${chartName}`, params), {
-    context: { service, chartName, query: new URLSearchParams(params).toString() },
+    context: { service, chartName, filters, params },
     forceRefresh: options.forceRefresh ?? false,
   })
   if (rows === undefined) {

@@ -28,6 +28,9 @@ dashboardServices:
   FARMER_REGISTRY_DASHBOARD_API_URL: http://farmer-registry-dashboard-api.far
   LIVESTOCK_REGISTRY_DASHBOARD_API_URL: http://livestock-registry-dashboard-api.live
   CROPSOWN_REGISTRY_DASHBOARD_API_URL: http://cropsown-registry-dashboard-api.crop
+  # The A2C platform's base URL. Left empty, the Access to Credit dashboard is
+  # not offered; set it per environment.
+  A2C_DASHBOARD_API_URL: ""
 
 # Seconds a dashboard service response is cached (and the warm-up interval).
 cacheTtlSeconds: 900

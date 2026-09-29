@@ -47,7 +47,8 @@ Every dashboard service implements the same HTTP interface.
   | `recordState` | Record status. When absent, services count active records |
 
   `all`, or leaving a parameter out, means no filter.
-- **Response:** `200`, with a JSON **array** of row objects. A chart with no data returns `[]`.
+- **Response:** `200`, with a JSON **array** of row objects, or an envelope carrying it as `data`
+  (`{"data": [...]}`). A chart with no data returns `[]`.
   Counts are integers and measures are numbers. Categorical values are registry codes, and the
   dashboards label them.
 - **Errors:** `404` for an unknown chart, `5xx` for failures. The BFF treats any non-2xx response as
@@ -85,6 +86,9 @@ To add a registry:
 3. **Configure** the URL variable in every environment (see [Configuration](configuration.md)).
 4. **Remove** the transitional SQL for those chart IDs from `lib/chart-queries.ts`.
 5. **Label** any new codes in `components/registry/registry-data.ts`.
+
+A service whose data does not match the dashboards one-to-one can declare an `adapter` that
+translates filters and rows; see [Data integration](data-integration.md#dashboard-service-charts).
 
 A service whose URL variable is not set is treated as unavailable. Its charts report an error, and
 the warm-up logs a warning, but the rest of the dashboards keep working.

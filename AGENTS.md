@@ -38,8 +38,7 @@ components/registry/registry-data.ts   labels for registry codes (age bands, ten
 
 ### Transitional SQL path
 - Do not extend it. When you have to touch it, never build a value into SQL. Filters reach it only
-  through the placeholders (`--- DYNAMIC_FILTERS ---`, `--- A2C_GEO_FILTERS ---`,
-  `--- A2C_PROVIDER_FILTERS ---`) and `$n` parameters. Column and table names come only from the
+  through the `--- DYNAMIC_FILTERS ---` placeholder and `$n` parameters. Column and table names come only from the
   fixed maps in `server/elysia-app.ts`.
 
 ### Filters
