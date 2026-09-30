@@ -98,6 +98,10 @@ pipeline {
                 // gateway reachable from its cluster yet.
                 A2C_DASHBOARD_API_URL         = "${env.BRANCH_NAME == 'staging' ? '' : 'https://a2c-develop-gateway.oanstaging.com'}"
                 A2C_DASHBOARD_API_CHARTS_PATH = "${env.BRANCH_NAME == 'staging' ? '' : '/v1/charts'}"
+                // The grievance service the Grievance Redress dashboard reads (its
+                // public charts API, at the default /api/v1/charts). Empty hides that
+                // dashboard: staging has no grievance deploy reachable yet.
+                GRIEVANCE_DASHBOARD_API_URL   = "${env.BRANCH_NAME == 'staging' ? '' : 'https://grievance-dev.oanstaging.com'}"
             }
             steps {
                 unstash 'oan-chart'
@@ -115,6 +119,13 @@ pipeline {
                             echo "\$A2C_HEADERS" | grep -qiE '^HTTP/[0-9.]+ 200' || { echo "A2C charts did not answer 200 at ${A2C_DASHBOARD_API_URL}${A2C_DASHBOARD_API_CHARTS_PATH}"; exit 1; }
                             echo "\$A2C_HEADERS" | grep -qiE '^via:.*kong' || { echo "${A2C_DASHBOARD_API_URL} does not go through Kong"; exit 1; }
                         fi
+                        # The grievance charts must be live before a build that shows them rolls.
+                        if [ -n "${GRIEVANCE_DASHBOARD_API_URL}" ]; then
+                            echo "=== Grievance charts check ==="
+                            GRV_STATUS=\$(curl -sS -m 20 -o /dev/null -w '%{http_code}' "${GRIEVANCE_DASHBOARD_API_URL}/api/v1/charts/grvKpis")
+                            echo "grvKpis: HTTP \$GRV_STATUS"
+                            [ "\$GRV_STATUS" = 200 ] || { echo "Grievance charts did not answer 200 at ${GRIEVANCE_DASHBOARD_API_URL}/api/v1/charts"; exit 1; }
+                        fi
                         cat > /tmp/values-oan-cicd-\${BUILD_NUMBER}.yaml <<EOF
 image:
   repository: ${ECR_REGISTRY}/${ECR_REPOSITORY}
@@ -126,6 +137,7 @@ ingress:
 dashboardServices:
   A2C_DASHBOARD_API_URL: "${A2C_DASHBOARD_API_URL}"
   A2C_DASHBOARD_API_CHARTS_PATH: "${A2C_DASHBOARD_API_CHARTS_PATH}"
+  GRIEVANCE_DASHBOARD_API_URL: "${GRIEVANCE_DASHBOARD_API_URL}"
 EOF
                         helm upgrade --install ${HELM_RELEASE} ${HELM_CHART_DIR} -n ${HELM_NAMESPACE} \
                             -f /tmp/values-oan-cicd-\${BUILD_NUMBER}.yaml --wait --timeout 10m
@@ -142,6 +154,7 @@ EOF
                         kubectl get --raw "\$SVC/api/health"; echo
                         SMOKE_CHARTS=farmerKpis,farmersByRegion,farmersByZone,landTenureSplit,registryTrendByMonth
                         if [ -n "${A2C_DASHBOARD_API_URL}" ]; then SMOKE_CHARTS=\$SMOKE_CHARTS,a2cKpis,a2cFilterLocations; fi
+                        if [ -n "${GRIEVANCE_DASHBOARD_API_URL}" ]; then SMOKE_CHARTS=\$SMOKE_CHARTS,grvKpis,grvFilterRegions; fi
                         CHARTS=\$(kubectl get --raw "\$SVC/api/charts?charts=\$SMOKE_CHARTS")
                         echo "\$CHARTS" | grep -o '"summary":{[^}]*}'
                         if ! echo "\$CHARTS" | grep -q '"failed":0'; then

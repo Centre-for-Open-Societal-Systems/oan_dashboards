@@ -34,6 +34,9 @@ dashboardServices:
   # Path of the A2C charts under that URL. Empty means /api/v1/charts (Frappe
   # directly); set /v1/charts when the URL is A2C's Kong gateway.
   A2C_DASHBOARD_API_CHARTS_PATH: ""
+  # The grievance service's base URL. Left empty, the Grievance Redress
+  # dashboard is not offered; set it per environment.
+  GRIEVANCE_DASHBOARD_API_URL: ""
 
 # Seconds a dashboard service response is cached (and the warm-up interval).
 cacheTtlSeconds: 900

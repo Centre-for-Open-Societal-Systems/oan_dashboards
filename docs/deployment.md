@@ -54,7 +54,7 @@ the build context. The chart runs the container with a read-only root filesystem
 | Value | Default | Purpose |
 | --- | --- | --- |
 | `image.repository`, `image.tag` | — (required) | Set by CI |
-| `dashboardServices` | the farmer (`.far`), livestock (`.live`) and crop sown (`.crop`) service URLs; `A2C_DASHBOARD_API_URL` empty | One URL variable per dashboard service. An empty URL hides that dashboard. CI sets `A2C_DASHBOARD_API_URL` per environment |
+| `dashboardServices` | the farmer (`.far`), livestock (`.live`) and crop sown (`.crop`) service URLs; `A2C_DASHBOARD_API_URL` and `GRIEVANCE_DASHBOARD_API_URL` empty | One URL variable per dashboard service. An empty URL hides that dashboard. CI sets the A2C and grievance URLs per environment |
 | `cacheTtlSeconds` | `900` | `DASHBOARD_CACHE_TTL_SECONDS` |
 | `env`, `envFrom` | empty | Extra variables. Supply `DATABASE_URL` from a Secret via `envFrom` to enable the transitional dashboards |
 | `ingress.public` | disabled | `enabled`, `host`, `gatewayName` (default `public-oanstaging`). Creates a Gateway (port 8080, HTTP2, selector `istio: ingressgateway`) and a VirtualService for the host |
@@ -87,11 +87,11 @@ All names start with the release name, so nothing collides with the `commons` pl
 | ECR Login | any agent | `aws ecr get-login-password` with credential `aws-ecr-creds`. Creates the repository `openg2p/oan-dashboards` (scan on push) if it does not exist yet |
 | Build & Push | any agent | Builds the image and pushes `<commit sha12>`. `develop` and `staging` also move a tag of their own name |
 | Stash chart | any agent | Stashes `helm/oan-dashboards` for the deploy agent |
-| Deploy (commons namespace) | `vpn-agent2`, `develop`/`staging` only | `helm upgrade --install oan-dashboards` in `commons` with the image, the environment's public host and its A2C URL, `--wait`; `kubectl rollout status`; then a **smoke test** |
+| Deploy (commons namespace) | `vpn-agent2`, `develop`/`staging` only | `helm upgrade --install oan-dashboards` in `commons` with the image, the environment's public host and its A2C and grievance URLs, `--wait`; `kubectl rollout status`; then a **smoke test** |
 
 **Smoke test.** Through the API server's proxy to the `oan-dashboards` Service, the pipeline calls
-`/api/health` and loads five farmer charts, plus two A2C charts where the environment has an A2C
-URL. It fails the build if any chart fails, and prints the failed charts with their errors. Helm runs with `HELM_DRIVER=configmap`: see
+`/api/health` and loads five farmer charts, plus two A2C charts and two grievance charts where
+the environment has those URLs. It fails the build if any chart fails, and prints the failed charts with their errors. Helm runs with `HELM_DRIVER=configmap`: see
 [Deploy permission](#deploy-permission-once-per-cluster). A freshly started pod has an
 empty cache, so this proves the dashboards can reach the farmer registry dashboard service.
 
@@ -113,6 +113,19 @@ deploy before anything rolls. The charts route is public in the gateway, so no c
 needed. The smoke test then loads two A2C charts through the running dashboards.
 
 Local development reads the local bench directly (`.env.example`), with the default path.
+
+**Grievance Redress, per environment.** The grievance dashboard reads the grievance service's
+public charts API at the default `/api/v1/charts`; the service answers from rollups it refreshes
+every 15 minutes, so no credentials are needed.
+
+| Branch | `GRIEVANCE_DASHBOARD_API_URL` |
+| --- | --- |
+| `develop` | `https://grievance-dev.oanstaging.com` |
+| `staging` | empty, so the dashboard is hidden: no grievance deploy is reachable from staging yet |
+
+**Grievance check.** Before the Helm deploy, where a grievance URL is set, the pipeline requests
+`<URL>/api/v1/charts/grvKpis` and fails the build unless it answers 200, so a grievance build
+without the charts API stops the deploy before anything rolls.
 
 ## Jenkins job
 
