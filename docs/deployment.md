@@ -95,21 +95,24 @@ URL. It fails the build if any chart fails, and prints the failed charts with th
 [Deploy permission](#deploy-permission-once-per-cluster). A freshly started pod has an
 empty cache, so this proves the dashboards can reach the farmer registry dashboard service.
 
-**A2C URL per environment.** The Access to Credit dashboard reads the A2C platform's public
-`/api/v1/charts` API. The Jenkinsfile sets it per branch:
+**A2C through its gateway, per environment.** The Access to Credit dashboard reads the A2C
+platform's public charts API, and deployed environments reach it only through A2C's Kong gateway,
+never the backend host directly. The gateway exposes the REST API as `/v1/...` and adds the `/api`
+prefix upstream, while Frappe itself serves only `/api/v1/...`, so the charts path is set with the
+URL. The Jenkinsfile sets both per branch:
 
-| Branch | `A2C_DASHBOARD_API_URL` |
-| --- | --- |
-| `develop` | `https://a2c-backend-development.oanstaging.com` (the A2C `develop` deploy) |
-| `staging` | empty, so the dashboard is hidden: no A2C staging backend is reachable from the staging cluster yet |
+| Branch | `A2C_DASHBOARD_API_URL` | `A2C_DASHBOARD_API_CHARTS_PATH` |
+| --- | --- | --- |
+| `develop` | `https://a2c-develop-gateway.oanstaging.com` (Kong in front of the A2C `develop` deploy) | `/v1/charts` |
+| `staging` | empty, so the dashboard is hidden: no A2C gateway is reachable from the staging cluster yet | empty |
 
-The A2C backend must serve `/api/v1/charts` before the dashboards deploy that points at it, or the
-smoke test fails.
+**Gateway check.** Before the Helm deploy, where an A2C URL is set, the pipeline requests
+`<URL><path>/a2cKpis` and fails the build unless it answers 200 **and** carries `Via: kong`. A URL
+pointing straight at the backend, a missing route, or an A2C build without the charts API stops the
+deploy before anything rolls. The charts route is public in the gateway, so no credentials are
+needed. The smoke test then loads two A2C charts through the running dashboards.
 
-To read A2C through its Kong gateway instead (for example `https://a2c-develop-gateway.oanstaging.com`),
-also set `A2C_DASHBOARD_API_CHARTS_PATH` to `/v1/charts`. The gateway's generated routes are `/v1/...`
-only and it adds the `/api` prefix upstream, while Frappe itself serves only `/api/v1/...`. The charts
-route is public in the gateway too, so no credentials are needed either way.
+Local development reads the local bench directly (`.env.example`), with the default path.
 
 ## Jenkins job
 
