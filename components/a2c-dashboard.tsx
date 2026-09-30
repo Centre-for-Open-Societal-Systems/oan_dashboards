@@ -5,9 +5,9 @@
 //
 //   consent request -> approved consent -> registry data share -> loan decision
 //
-// There is no live A2C feed yet, so everything here is backed by the sample data
-// in data/a2c/*.sql. A2C carries its own location P-codes rather than g2p ids,
-// so the sidebar hides the registry filters while this dashboard is selected.
+// Data comes from the A2C platform through its dashboard service (see
+// server/a2c-service.ts). A2C is filtered by lender and by its own location
+// selection, so the sidebar hides the registry filters while it is selected.
 
 import { useMemo } from "react"
 import {

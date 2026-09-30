@@ -91,12 +91,30 @@ pipeline {
             environment {
                 KUBECONFIG_CREDENTIAL = "${env.BRANCH_NAME == 'staging' ? 'staging-farmer-kubeconfig' : 'gen2-dev-kubeconfig'}"
                 PUBLIC_HOST           = "${env.BRANCH_NAME == 'staging' ? 'oan-dashboard.oanstaging.com' : 'oan-dashboard-development.oanstaging.com'}"
+                // The A2C platform the Access to Credit dashboard reads (its public
+                // charts API), always through A2C's Kong gateway, never the backend
+                // host directly. The gateway exposes the REST API as /v1/..., hence
+                // the charts path. Empty hides that dashboard: staging has no A2C
+                // gateway reachable from its cluster yet.
+                A2C_DASHBOARD_API_URL         = "${env.BRANCH_NAME == 'staging' ? '' : 'https://a2c-develop-gateway.oanstaging.com'}"
+                A2C_DASHBOARD_API_CHARTS_PATH = "${env.BRANCH_NAME == 'staging' ? '' : '/v1/charts'}"
             }
             steps {
                 unstash 'oan-chart'
                 withCredentials([file(credentialsId: env.KUBECONFIG_CREDENTIAL, variable: 'KUBECONFIG')]) {
                     sh """
                         set -e
+                        # A2C is read only through its Kong gateway. Before deploying,
+                        # prove the configured URL answers the charts route with 200 and
+                        # that the answer came through Kong (Via: kong), not straight
+                        # from the backend.
+                        if [ -n "${A2C_DASHBOARD_API_URL}" ]; then
+                            echo "=== A2C gateway check ==="
+                            A2C_HEADERS=\$(curl -sS -m 20 -o /dev/null -D - "${A2C_DASHBOARD_API_URL}${A2C_DASHBOARD_API_CHARTS_PATH}/a2cKpis")
+                            echo "\$A2C_HEADERS" | grep -iE '^(HTTP/|via:)'
+                            echo "\$A2C_HEADERS" | grep -qiE '^HTTP/[0-9.]+ 200' || { echo "A2C charts did not answer 200 at ${A2C_DASHBOARD_API_URL}${A2C_DASHBOARD_API_CHARTS_PATH}"; exit 1; }
+                            echo "\$A2C_HEADERS" | grep -qiE '^via:.*kong' || { echo "${A2C_DASHBOARD_API_URL} does not go through Kong"; exit 1; }
+                        fi
                         cat > /tmp/values-oan-cicd-\${BUILD_NUMBER}.yaml <<EOF
 image:
   repository: ${ECR_REGISTRY}/${ECR_REPOSITORY}
@@ -105,6 +123,9 @@ ingress:
   public:
     enabled: true
     host: ${PUBLIC_HOST}
+dashboardServices:
+  A2C_DASHBOARD_API_URL: "${A2C_DASHBOARD_API_URL}"
+  A2C_DASHBOARD_API_CHARTS_PATH: "${A2C_DASHBOARD_API_CHARTS_PATH}"
 EOF
                         helm upgrade --install ${HELM_RELEASE} ${HELM_CHART_DIR} -n ${HELM_NAMESPACE} \
                             -f /tmp/values-oan-cicd-\${BUILD_NUMBER}.yaml --wait --timeout 10m
@@ -119,7 +140,9 @@ EOF
                         echo "=== oan-dashboards smoke test ==="
                         SVC=/api/v1/namespaces/${HELM_NAMESPACE}/services/${HELM_RELEASE}:http/proxy
                         kubectl get --raw "\$SVC/api/health"; echo
-                        CHARTS=\$(kubectl get --raw "\$SVC/api/charts?charts=farmerKpis,farmersByRegion,farmersByZone,landTenureSplit,registryTrendByMonth")
+                        SMOKE_CHARTS=farmerKpis,farmersByRegion,farmersByZone,landTenureSplit,registryTrendByMonth
+                        if [ -n "${A2C_DASHBOARD_API_URL}" ]; then SMOKE_CHARTS=\$SMOKE_CHARTS,a2cKpis,a2cFilterLocations; fi
+                        CHARTS=\$(kubectl get --raw "\$SVC/api/charts?charts=\$SMOKE_CHARTS")
                         echo "\$CHARTS" | grep -o '"summary":{[^}]*}'
                         if ! echo "\$CHARTS" | grep -q '"failed":0'; then
                             echo "charts failed:"

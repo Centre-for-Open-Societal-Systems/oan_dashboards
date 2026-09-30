@@ -28,6 +28,12 @@ dashboardServices:
   FARMER_REGISTRY_DASHBOARD_API_URL: http://farmer-registry-dashboard-api.far
   LIVESTOCK_REGISTRY_DASHBOARD_API_URL: http://livestock-registry-dashboard-api.live
   CROPSOWN_REGISTRY_DASHBOARD_API_URL: http://cropsown-registry-dashboard-api.crop
+  # The A2C platform's base URL. Left empty, the Access to Credit dashboard is
+  # not offered; set it per environment.
+  A2C_DASHBOARD_API_URL: ""
+  # Path of the A2C charts under that URL. Empty means /api/v1/charts (Frappe
+  # directly); set /v1/charts when the URL is A2C's Kong gateway.
+  A2C_DASHBOARD_API_CHARTS_PATH: ""
 
 # Seconds a dashboard service response is cached (and the warm-up interval).
 cacheTtlSeconds: 900

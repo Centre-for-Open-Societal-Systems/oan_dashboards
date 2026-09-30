@@ -57,13 +57,13 @@ Tips for development:
 
 ## Transitional dashboard database
 
-The Catalogs, Access to Credit and DevOps dashboards (and some Registries panels) still read a
+The Catalogs and DevOps dashboards (and some Registries panels) still read a
 PostgreSQL database directly, until their dashboard services exist. To work on them locally:
 
 1. Create a local database and set `DATABASE_URL` in your `.env`.
 2. Load the sample data with the scripts in `scripts/`:
    - `npm run db:setup` / `db:seed` for the application tables
-   - `db:catalog`, `db:a2c` and `db:devops` for the domain tables
+   - `db:catalog` and `db:devops` for the domain tables
 
    The scripts read their connection settings (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`,
    `DB_NAME`) from your shell environment or your uncommitted `.env`. Use local development

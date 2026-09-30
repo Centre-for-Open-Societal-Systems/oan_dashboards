@@ -121,61 +121,15 @@ async function convertPcodsToIds(filters: any) {
 }
 
 const DYNAMIC_FILTERS = '--- DYNAMIC_FILTERS ---'
-const A2C_GEO_FILTERS = '--- A2C_GEO_FILTERS ---'
-const A2C_PROVIDER_FILTERS = '--- A2C_PROVIDER_FILTERS ---'
-
-// A2C tables carry HDX P-codes and their own provider ids, so its filters are
-// matched against the raw codes inside the A2C_SCOPE views and must bypass the
-// g2p id conversion the registry queries depend on.
-const a2cGeoColumns = {
-  region: 'region_pcode',
-  zone: 'zone_pcode',
-  woreda: 'woreda_pcode',
-} as const
-
-// Both clauses are numbered in the order the placeholders appear in A2C_SCOPE
-// (geography first), so the returned values line up with the $n they fill.
-function buildA2CClauses(filters: ChartFilters): { geo: string; provider: string; values: any[] } {
-  const values: any[] = []
-  const geo: string[] = []
-
-  for (const [key, column] of Object.entries(a2cGeoColumns)) {
-    const value = filters[key as keyof ChartFilters]
-    if (value && value !== 'all') {
-      geo.push(`${column} = $${values.length + 1}`)
-      values.push(value)
-    }
-  }
-
-  let provider = ''
-  if (filters.provider && filters.provider !== 'all') {
-    provider = `AND id = $${values.length + 1}::integer`
-    values.push(filters.provider)
-  }
-
-  return {
-    geo: geo.length > 0 ? `AND ${geo.join(' AND ')}` : '',
-    provider,
-    values,
-  }
-}
 
 // Resolves a chart's SQL and its bind values. Which filter dialect a query
 // speaks is decided by the placeholder it carries, so callers need not know
-// whether a chart is a registry, reference-data or A2C query.
+// whether a chart is a registry or reference-data query.
 function prepareChartSql(
   baseQuery: string,
   filters: ChartFilters,
   convertedFilters: ChartFilters
 ): { sql: string; values: any[] } {
-  if (baseQuery.includes(A2C_GEO_FILTERS)) {
-    const { geo, provider, values } = buildA2CClauses(filters)
-    return {
-      sql: baseQuery.replace(A2C_GEO_FILTERS, geo).replace(A2C_PROVIDER_FILTERS, provider),
-      values,
-    }
-  }
-
   if (!baseQuery.includes(DYNAMIC_FILTERS)) {
     return { sql: baseQuery, values: [] }
   }
@@ -413,12 +367,16 @@ export function createElysiaApp(prefix = '/api') {
       }
     })
     // Which dashboards this deployment can serve. Registries are served by the
-    // registry dashboard services; the others still need the transitional
+    // registry dashboard services and A2C by the A2C platform, each offered when
+    // its service URL is set; catalogs and DevOps still need the transitional
     // database (DATABASE_URL) and are hidden without it.
     .get('/config', () => ({
-      dashboards: transitionalDatabaseConfigured()
-        ? ['registries', 'catalogs', 'a2c', 'devops']
-        : ['registries'],
+      dashboards: [
+        'registries',
+        ...(transitionalDatabaseConfigured() ? ['catalogs'] : []),
+        ...(serviceConfigured('a2c') ? ['a2c'] : []),
+        ...(transitionalDatabaseConfigured() ? ['devops'] : []),
+      ],
       // Each dedicated registry view needs its registry dashboard service.
       registryViews: {
         crop: serviceConfigured('cropsown-registry'),

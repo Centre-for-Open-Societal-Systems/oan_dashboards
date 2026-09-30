@@ -27,7 +27,6 @@ Each group below moves to its registry's dashboard service as that service becom
 | --- | --- | --- |
 | Farmer registry panels not yet on the service | `landStats`, `landAreaByRegion`, `demographyStats`, `socioEconomicKpis`, `recentRegistrations`, `householdIncomeSources` | `res_partner` and related `g2p_*` tables |
 | Catalogs | `catalog*` | `crop_catalog`, `crop_variety`, `livestock_*`, `seed_*`, location catalogue |
-| Access to Credit | `a2c*` | `a2c_*` tables, through the `A2C_SCOPE` views |
 | DevOps | `devops*` | `devops_*` tables |
 
 ## Filters
@@ -43,7 +42,7 @@ The UI sends filters as query parameters on `/api/charts`:
 | `farmingType` | Farming Type | `crop`, `livestock`, `mixed` |
 | `farmerType` | Type of Farmer | Farmer type label |
 | `recordState` (or `state`) | Record Status | Record status |
-| `provider` | Credit Provider (Access to Credit only) | Provider id |
+| `provider` | Credit Provider (Access to Credit only) | Participating bank id |
 
 `all`, or leaving the parameter out, means no filter.
 
@@ -57,6 +56,18 @@ service documents how it applies them; the farmer registry service, for example,
 records when `recordState` is absent. Filters a service does not accept are not forwarded, so they
 do not split the cache.
 
+A service can instead declare an `adapter` (`ServiceAdapter`) that builds a chart's rows from the
+dashboard's filters and calls to its own charts. Access to Credit uses one (`server/a2c-service.ts`)
+because the A2C platform keeps locations as the names the farmer registry sent, not codes:
+
+- A selected region, zone or woreda is sent as the A2C names that resolve to it (`region` and
+  `woreda`, comma-separated), taken from the service's own `a2cFilterLocations`. A zone is sent as
+  its woredas. `provider` is passed through.
+- Names in rows are resolved to boundary units, case- and punctuation-insensitively, a woreda within
+  its region. The zone series is rolled up from woredas, and `a2cFilterLocations` gains its codes.
+  A place that does not resolve keeps its row without a code.
+- A2C records stop at woreda, so `a2cLoansByKebele` is always empty.
+
 ### Local SQL charts (transitional)
 
 A SQL template declares which filters it accepts by carrying a placeholder:
@@ -64,10 +75,9 @@ A SQL template declares which filters it accepts by carrying a placeholder:
 | Placeholder | Expanded by | Produces |
 | --- | --- | --- |
 | `--- DYNAMIC_FILTERS ---` | `buildWhereClause` | `AND rp.region = $1::integer AND …`. Geography codes are first converted to the integer ids of the `g2p_region`/`g2p_zone`/`g2p_woreda`/`g2p_kebele` tables (`convertPcodsToIds`). `farmingType` is matched against known aliases |
-| `--- A2C_GEO_FILTERS ---` and `--- A2C_PROVIDER_FILTERS ---` | `buildA2CClauses` | `AND region_pcode = $1 …` and `AND id = $n::integer` |
 | none | — | Filters are ignored (reference data) |
 
-Column names come from fixed maps (`filterColumnMap`, `a2cGeoColumns`, and `chartFilterOverrides`
+Column names come from fixed maps (`filterColumnMap` and `chartFilterOverrides`
 for charts that join on a different alias). Values are always bound as `$n` parameters.
 
 ## Response format
