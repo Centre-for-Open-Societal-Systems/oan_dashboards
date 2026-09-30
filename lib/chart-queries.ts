@@ -14,6 +14,8 @@ export interface ChartFilters {
   timePeriod?: string;
   /** A2C only: id of the credit provider (bank) to narrow the dashboard to. */
   provider?: string;
+  /** Grievance only: service category name (Inputs, Schemes, ...). */
+  category?: string;
 }
 
 export interface ChartQueryResult {

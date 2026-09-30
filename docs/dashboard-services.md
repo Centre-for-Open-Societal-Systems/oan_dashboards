@@ -23,7 +23,9 @@ A dashboard service:
 - computes each chart as an aggregate query over the registry's reporting views
 - returns **aggregates only**: no names, identifiers, contact details or coordinates
 - binds every filter value as a query parameter
-- is reachable only on the private network (no public ingress, no end-user authentication)
+- is reachable only on the private network (no public ingress, no end-user authentication), or,
+  for a platform behind its own API gateway (A2C, grievance), only through that gateway, which
+  requires the dashboards' API key (`apiKeyEnv`, sent as the `apikey` header)
 
 The dashboards BFF:
 

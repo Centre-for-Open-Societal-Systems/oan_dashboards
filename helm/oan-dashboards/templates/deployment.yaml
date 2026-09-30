@@ -48,9 +48,18 @@ spec:
             - name: {{ $name }}
               value: {{ tpl (toString $value) $ | quote }}
             {{- end }}
-          {{- with .Values.envFrom }}
+          {{- if or .Values.envFrom .Values.serviceKeysSecret }}
           envFrom:
+            {{- with .Values.serviceKeysSecret }}
+            # Gateway API keys (A2C_DASHBOARD_API_KEY, GRIEVANCE_DASHBOARD_API_KEY).
+            # Optional, so a missing Secret never blocks a deploy.
+            - secretRef:
+                name: {{ . }}
+                optional: true
+            {{- end }}
+            {{- with .Values.envFrom }}
             {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- end }}
           securityContext:
             allowPrivilegeEscalation: false

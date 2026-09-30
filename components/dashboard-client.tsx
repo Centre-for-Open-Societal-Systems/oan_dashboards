@@ -11,6 +11,12 @@ import {
   useA2CFilterOptions,
   type A2CFilters,
 } from "@/hooks/use-a2c-filters"
+import {
+  EMPTY_GRIEVANCE_FILTERS,
+  grievanceFilterChips,
+  useGrievanceFilterOptions,
+  type GrievanceFilters,
+} from "@/hooks/use-grievance-filters"
 import dynamic from "next/dynamic"
 import { DashboardSectionSkeleton } from "@/components/ui/dashboard-skeleton"
 import { useDeploymentConfig } from "@/hooks/use-deployment-config"
@@ -47,6 +53,7 @@ export default function DashboardClient({
   const [dashboardType, setDashboardType] = useState<DashboardType>('registries')
   const isCatalogs = dashboardType === 'catalogs'
   const isA2C = dashboardType === 'a2c'
+  const isGrievance = dashboardType === 'grievance'
   const isDevOps = dashboardType === 'devops'
   // Catalogues and DevOps ignore the filters entirely; A2C keeps its own set,
   // since it is scoped by lender and by its own location codes.
@@ -54,6 +61,9 @@ export default function DashboardClient({
 
   const [a2cFilters, setA2CFilters] = useState<A2CFilters>(EMPTY_A2C_FILTERS)
   const { options: a2cOptions } = useA2CFilterOptions(isA2C)
+
+  const [grievanceFilters, setGrievanceFilters] = useState<GrievanceFilters>(EMPTY_GRIEVANCE_FILTERS)
+  const { options: grievanceOptions } = useGrievanceFilterOptions(isGrievance)
 
   // Crop and livestock farming swap the overview for a dedicated registry view.
   const registryView: 'crop' | 'livestock' | null =
@@ -109,6 +119,15 @@ export default function DashboardClient({
 
   const clearA2CFilter = useCallback((key: keyof A2CFilters) => {
     setA2CFilters(prev => applyA2CFilterChange(prev, key, 'all'))
+  }, [])
+
+  const grievanceChips = useMemo(
+    () => grievanceFilterChips(grievanceFilters, grievanceOptions),
+    [grievanceFilters, grievanceOptions]
+  )
+
+  const clearGrievanceFilter = useCallback((key: keyof GrievanceFilters) => {
+    setGrievanceFilters(prev => ({ ...prev, [key]: 'all' }))
   }, [])
 
   // Load region lookup once for name resolution in header tags
@@ -366,6 +385,22 @@ export default function DashboardClient({
                 </button>
               </div>
             ))}
+
+            {isGrievance && grievanceChips.map((chip) => (
+              <div
+                key={chip.key}
+                className="bg-white/10 px-3 py-1 rounded-full text-xs font-medium text-white border border-white/20 flex items-center gap-2"
+              >
+                <span>{chip.label}: {chip.value}</span>
+                <button
+                  onClick={() => clearGrievanceFilter(chip.key)}
+                  className="hover:bg-white/20 rounded-full p-0.5 transition-colors"
+                  aria-label={`Clear ${chip.label} filter`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
           </div>
 
           <div className="flex items-center space-x-2">
@@ -389,6 +424,8 @@ export default function DashboardClient({
                   ? captureElementById('dashboard-catalogs', 'catalogs')
                   : isA2C
                     ? captureElementById('dashboard-a2c', 'a2c-access-to-credit')
+                    : isGrievance
+                    ? captureElementById('dashboard-grievance', 'grievance-redress')
                     : isDevOps
                       ? captureElementById('dashboard-devops', 'devops-infrastructure')
                       : registryView
@@ -417,6 +454,8 @@ export default function DashboardClient({
               availableDashboards={deploymentConfig.dashboards}
               a2cFilters={a2cFilters}
               onA2CFiltersChange={setA2CFilters}
+              grievanceFilters={grievanceFilters}
+              onGrievanceFiltersChange={setGrievanceFilters}
             />
           </div>
 
@@ -447,6 +486,10 @@ export default function DashboardClient({
                 geoJsonData={geoJsonData}
                 onMapFilterChange={handleA2CMapFilterChange}
               />
+            </div>
+          ) : isGrievance ? (
+            <div id="dashboard-grievance" className="h-full min-h-0">
+              <GrievanceDashboard filters={grievanceFilters} />
             </div>
           ) : isDevOps ? (
             <div id="dashboard-devops" className="h-full min-h-0">
@@ -504,6 +547,11 @@ const CatalogsDashboard = dynamic(
 
 const A2CDashboard = dynamic(
   () => import("@/components/a2c-dashboard").then(mod => mod.A2CDashboard),
+  { ssr: false, loading: () => <TabSkeleton /> }
+)
+
+const GrievanceDashboard = dynamic(
+  () => import("@/components/grievance-dashboard").then(mod => mod.GrievanceDashboard),
   { ssr: false, loading: () => <TabSkeleton /> }
 )
 
