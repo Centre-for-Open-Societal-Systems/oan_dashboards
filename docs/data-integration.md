@@ -68,6 +68,11 @@ because the A2C platform keeps locations as the names the farmer registry sent, 
   A place that does not resolve keeps its row without a code.
 - A2C records stop at woreda, so `a2cLoansByKebele` is always empty.
 
+Grievance Redress needs no adapter: the grievance service already keys regions by P-code. It
+accepts `region` and `category` only, rolls cases up by region, and has no zone, woreda or kebele
+level, so its dashboard shows a region breakdown instead of the drill-down map. Its rows are counts
+refreshed every 15 minutes by the service itself, and never carry grievance text or a person.
+
 ### Local SQL charts (transitional)
 
 A SQL template declares which filters it accepts by carrying a placeholder:

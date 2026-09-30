@@ -126,7 +126,7 @@ Served by `GET /api/filter-options` and `GET /api/locations?regionId=|zoneId=|wo
 | --- | --- |
 | Filter sidebar: dashboard selector, cascading Region → Zone → Woreda → Kebele, Farming Type, Record Status, Type of Farmer (Credit Provider for Access to Credit) | `components/global-filters-sidebar.tsx` |
 | Registries: overview (default), plus crop and livestock views selected by farming type | `components/farmer-overview-dashboard.tsx`, `crop-sown-dashboard.tsx`, `livestock-dashboard.tsx` |
-| Other dashboards | `components/catalogs-dashboard.tsx`, `a2c-dashboard.tsx`, `devops-dashboard.tsx` |
+| Other dashboards | `components/catalogs-dashboard.tsx`, `a2c-dashboard.tsx`, `grievance-dashboard.tsx`, `devops-dashboard.tsx` |
 | Registry UI kit and code labels (age bands, tenure) | `components/registry/registry-ui.tsx`, `registry-data.ts` |
 | Map, loaded when scrolled into view; clicking applies a geography filter | `components/ethiopia-map.tsx`, `components/lazy/map-when-visible.tsx` |
 | Export of the visible panels as PNG, PDF or CSV | `components/registry/export-button.tsx` |

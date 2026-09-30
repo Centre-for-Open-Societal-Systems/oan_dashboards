@@ -367,14 +367,16 @@ export function createElysiaApp(prefix = '/api') {
       }
     })
     // Which dashboards this deployment can serve. Registries are served by the
-    // registry dashboard services and A2C by the A2C platform, each offered when
-    // its service URL is set; catalogs and DevOps still need the transitional
-    // database (DATABASE_URL) and are hidden without it.
+    // registry dashboard services, A2C by the A2C platform and grievances by the
+    // grievance service, each offered when its service URL is set; catalogs and
+    // DevOps still need the transitional database (DATABASE_URL) and are hidden
+    // without it.
     .get('/config', () => ({
       dashboards: [
         'registries',
         ...(transitionalDatabaseConfigured() ? ['catalogs'] : []),
         ...(serviceConfigured('a2c') ? ['a2c'] : []),
+        ...(serviceConfigured('grievance') ? ['grievance'] : []),
         ...(transitionalDatabaseConfigured() ? ['devops'] : []),
       ],
       // Each dedicated registry view needs its registry dashboard service.
@@ -562,6 +564,7 @@ export function createElysiaApp(prefix = '/api') {
         dateTo: (query.dateTo as string) || undefined,
         sector: (query.sector as string) || undefined,
         provider: (query.provider as string) || undefined,
+        category: (query.category as string) || undefined,
       }
 
       Object.keys(filters).forEach(key => {

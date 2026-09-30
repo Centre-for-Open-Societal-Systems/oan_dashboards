@@ -107,6 +107,19 @@ export const DASHBOARD_SERVICES: readonly DashboardService[] = [
     ],
     adapter: a2cAdapter,
   },
+  {
+    // Grievance redress, served by the grievance service from rollups it
+    // refreshes every 15 minutes. Regions are P-codes already, so no adapter.
+    id: 'grievance',
+    urlEnv: 'GRIEVANCE_DASHBOARD_API_URL',
+    filters: ['region', 'category'],
+    charts: [
+      'grvKpis', 'grvPerformanceKpis', 'grvMonthlyTrend', 'grvWeeklyTrend', 'grvNetBacklogTrend',
+      'grvStatusDistribution', 'grvByCategory', 'grvCategoryResolution', 'grvResolutionRateByRegion',
+      'grvSlaRisk', 'grvPendingDuplicates', 'grvOldestOpen',
+      'grvFilterRegions', 'grvFilterCategories',
+    ],
+  },
 ]
 
 const SERVICE_BY_CHART = new Map<string, DashboardService>(
