@@ -28,6 +28,7 @@ reads its base URL from its own variable.
 | `A2C_DASHBOARD_API_URL` | Access to Credit, served by the A2C platform | `http://localhost:8000` (the A2C site's base URL) |
 | `A2C_DASHBOARD_API_CHARTS_PATH` | Path of the A2C charts under that URL. Default `/api/v1/charts`, which is how Frappe serves them. Set `/v1/charts` when the URL is A2C's Kong gateway, which exposes the REST API without the `/api` prefix | `/v1/charts` |
 | `GRIEVANCE_DASHBOARD_API_URL` | Grievance Redress, served by the grievance service at `/api/v1/charts` | `https://grievance-dev.oanstaging.com` |
+| `A2C_DASHBOARD_API_KEY`, `GRIEVANCE_DASHBOARD_API_KEY` | API key sent as the `apikey` header to that service's Kong gateway once it enforces auth (Kong consumer `oan-dashboards`). Unset sends no key. **Secret:** supply from a Kubernetes Secret (`serviceKeysSecret` in the chart), never a plain value | — |
 | *one variable per additional registry service* | as declared in `DASHBOARD_SERVICES` | |
 
 - The URL must be reachable from the dashboards server. It is not used by browsers.

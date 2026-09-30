@@ -107,16 +107,18 @@ URL. The Jenkinsfile sets both per branch:
 | `staging` | empty, so the dashboard is hidden: no A2C gateway is reachable from the staging cluster yet | empty |
 
 **Gateway check.** Before the Helm deploy, where an A2C URL is set, the pipeline requests
-`<URL><path>/a2cKpis` and fails the build unless it answers 200 **and** carries `Via: kong`. A URL
-pointing straight at the backend, a missing route, or an A2C build without the charts API stops the
-deploy before anything rolls. The charts route is public in the gateway, so no credentials are
-needed. The smoke test then loads two A2C charts through the running dashboards.
+`<URL><path>/a2cKpis` and fails the build unless Kong answers it (`Via: kong`) with 200, or with
+401/403 once the gateway enforces the dashboards' key (the check holds no key). A URL pointing
+straight at the backend, a missing route, or an A2C build without the charts API stops the deploy
+before anything rolls. The smoke test then loads two A2C charts through the running dashboards,
+which send the key, so it proves the key end to end.
 
 Local development reads the local bench directly (`.env.example`), with the default path.
 
 **Grievance Redress, per environment.** The grievance dashboard reads the grievance service's
-public charts API at the default `/api/v1/charts`; the service answers from rollups it refreshes
-every 15 minutes, so no credentials are needed.
+charts API at the default `/api/v1/charts`; the service answers from rollups it refreshes every
+15 minutes. Once a Kong gateway in front of it enforces authorization, the URL becomes the
+gateway's and the dashboards send their key.
 
 | Branch | `GRIEVANCE_DASHBOARD_API_URL` |
 | --- | --- |
@@ -124,8 +126,19 @@ every 15 minutes, so no credentials are needed.
 | `staging` | empty, so the dashboard is hidden: no grievance deploy is reachable from staging yet |
 
 **Grievance check.** Before the Helm deploy, where a grievance URL is set, the pipeline requests
-`<URL>/api/v1/charts/grvKpis` and fails the build unless it answers 200, so a grievance build
-without the charts API stops the deploy before anything rolls.
+`<URL>/api/v1/charts/grvKpis` and fails the build unless it answers 200, or 401/403 from Kong once
+the gateway enforces the dashboards' key, so a grievance build without the charts API stops the
+deploy before anything rolls.
+
+### Gateway API keys (once per cluster)
+
+When Kong enforces authorization on A2C or the grievance service, the dashboards present one API
+key per service as the `apikey` header (Kong consumer `oan-dashboards`, group `dashboards`). The
+keys live in the Secret `oan-dashboards-service-keys` in `commons`, which the pipeline mounts
+optionally (`serviceKeysSecret`), so deploys work before it exists. A cluster admin creates it
+once, from the secret store; the deploy role cannot update Secrets, so the pipeline never manages
+it. See `deploy/k8s/service-keys-secret.example.yaml`. Each key must equal the one that service's
+gateway was synced with (`DECK_OAN_DASHBOARDS_API_KEY`); rotate both, then restart the deployment.
 
 ## Jenkins job
 

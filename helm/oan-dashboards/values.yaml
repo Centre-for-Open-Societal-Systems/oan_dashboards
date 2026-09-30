@@ -48,6 +48,12 @@ cacheTtlSeconds: 900
 env: {}
 envFrom: []
 
+# Secret holding the API keys the services' Kong gateways expect, one variable
+# per service (A2C_DASHBOARD_API_KEY, GRIEVANCE_DASHBOARD_API_KEY). Created once
+# per cluster by an admin (deploy/k8s/service-keys-secret.example.yaml), since the
+# deploy role cannot update Secrets; mounted optionally, so it may not exist yet.
+serviceKeysSecret: ""
+
 resources:
   requests:
     cpu: 100m
