@@ -1,40 +1,7 @@
-# Deployment and operations
+# Deployment
 
-The dashboards run in the shared `commons` namespace of the OpenG2P clusters, next to the platform
-services. Jenkins builds the image, pushes it to ECR, and deploys it with the Helm chart in
-`helm/oan-dashboards`. The release owns everything it needs in the namespace, including its ECR
-pull secret. The only one-time cluster step is the deploy permission
-([Deploy permission](#deploy-permission-once-per-cluster)).
-
-| Environment | Branch | Cluster | Public URL | Jenkins kubeconfig credential |
-| --- | --- | --- | --- | --- |
-| dev | `develop` | gen2 dev (RKE2, API `https://10.0.1.166:6443`) | https://oan-dashboard-development.oanstaging.com | `gen2-dev-kubeconfig` |
-| staging | `staging` | staging (`10.0.1.212`) | https://oan-dashboard.oanstaging.com | `staging-farmer-kubeconfig` |
-
-The kubeconfig credentials are the farmer registry's: both are for the `far:farmer-ci`
-ServiceAccount. Other branches and pull requests build and push the image but do not deploy.
-
-## Topology
-
-```mermaid
-flowchart LR
-    User -->|HTTPS| Nginx[host nginx :443<br/>TLS, certbot]
-    Nginx -->|HTTP, Host header| Istio[Istio ingress gateway<br/>NodePort 30080]
-    Istio -->|Gateway public-oanstaging<br/>VirtualService| Svc[commons/oan-dashboards]
-    Svc --> Pod[oan-dashboards pod :3000]
-    Pod -->|HTTP| FRS[far/farmer-registry-dashboard-api]
-    Pod -->|HTTP| LRS[live/livestock-registry-dashboard-api]
-    Pod -->|HTTP| CRS[crop/cropsown-registry-dashboard-api]
-```
-
-- **Exposure.** Only the dashboards are public. The registry dashboard services stay `ClusterIP`,
-  and the dashboards call them server-to-server, one URL variable per service
-  (`FARMER_REGISTRY_DASHBOARD_API_URL=http://farmer-registry-dashboard-api.far`, and likewise
-  `LIVESTOCK_…` in `live` and `CROPSOWN_…` in `crop`). Each registry's own pipeline deploys its
-  service.
-- **Transitional database.** Without `DATABASE_URL`, `/api/config` offers only the Registries
-  dashboard. Catalogs, Access to Credit and DevOps stay hidden until they have dashboard services,
-  or until the transitional database is provided.
+This public application serves only Access to Credit and Grievance aggregates.
+Registry dashboards are deployed independently by each owning registry.
 
 ## Container image
 
@@ -54,9 +21,9 @@ the build context. The chart runs the container with a read-only root filesystem
 | Value | Default | Purpose |
 | --- | --- | --- |
 | `image.repository`, `image.tag` | — (required) | Set by CI |
-| `dashboardServices` | the farmer (`.far`), livestock (`.live`) and crop sown (`.crop`) service URLs; `A2C_DASHBOARD_API_URL` and `GRIEVANCE_DASHBOARD_API_URL` empty | One URL variable per dashboard service. An empty URL hides that dashboard. CI sets the A2C and grievance URLs per environment |
+| `dashboardServices` | `A2C_DASHBOARD_API_URL` and `GRIEVANCE_DASHBOARD_API_URL` empty | One URL variable per dashboard service. An empty URL hides that dashboard. CI sets the A2C and grievance URLs per environment |
 | `cacheTtlSeconds` | `900` | `DASHBOARD_CACHE_TTL_SECONDS` |
-| `env`, `envFrom` | empty | Extra variables. Supply `DATABASE_URL` from a Secret via `envFrom` to enable the transitional dashboards |
+| `env`, `envFrom` | empty | Extra variables. Use Secret references for the A2C and Grievance service keys |
 | `ingress.public` | disabled | `enabled`, `host`, `gatewayName` (default `public-oanstaging`). Creates a Gateway (port 8080, HTTP2, selector `istio: ingressgateway`) and a VirtualService for the host |
 | `ingress.private` | disabled | A VirtualService on an existing private gateway in the namespace |
 | `ecrPullSecret` | enabled, secret `oan-dashboards-ecr` | ECR pull secret owned by the release. `registry` defaults to the host of `image.repository` |
@@ -275,7 +242,7 @@ ingress. For a new hostname:
 | Liveness | `GET /api/health` | `{"status":"ok"}` |
 | Registry data | `GET /api/charts?charts=farmerKpis` | `summary.failed = 0`; `executionTime` about 0 ms once warm |
 | Dashboard service availability | pod logs starting `[dashboard-services]` | None. Repeated `refresh failed` lines point to a service or its database |
-| Offered dashboards | `GET /api/config` | `["registries"]` without the transitional database |
+| Offered dashboards | `GET /api/config` | Only A2C and Grievance services with configured URLs |
 
 ## Troubleshooting
 

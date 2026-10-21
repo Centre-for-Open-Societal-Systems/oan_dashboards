@@ -159,9 +159,9 @@ EOF
                         echo "=== oan-dashboards smoke test ==="
                         SVC=/api/v1/namespaces/${HELM_NAMESPACE}/services/${HELM_RELEASE}:http/proxy
                         kubectl get --raw "\$SVC/api/health"; echo
-                        SMOKE_CHARTS=farmerKpis,farmersByRegion,farmersByZone,landTenureSplit,registryTrendByMonth
-                        if [ -n "${A2C_DASHBOARD_API_URL}" ]; then SMOKE_CHARTS=\$SMOKE_CHARTS,a2cKpis,a2cFilterLocations; fi
-                        if [ -n "${GRIEVANCE_DASHBOARD_API_URL}" ]; then SMOKE_CHARTS=\$SMOKE_CHARTS,grvKpis,grvFilterRegions; fi
+                        SMOKE_CHARTS=
+                        if [ -n "${A2C_DASHBOARD_API_URL}" ]; then SMOKE_CHARTS=a2cKpis,a2cFilterLocations; fi
+                        if [ -n "${GRIEVANCE_DASHBOARD_API_URL}" ]; then SMOKE_CHARTS=\${SMOKE_CHARTS:+\$SMOKE_CHARTS,}grvKpis,grvFilterRegions; fi
                         CHARTS=\$(kubectl get --raw "\$SVC/api/charts?charts=\$SMOKE_CHARTS")
                         echo "\$CHARTS" | grep -o '"summary":{[^}]*}'
                         if ! echo "\$CHARTS" | grep -q '"failed":0'; then

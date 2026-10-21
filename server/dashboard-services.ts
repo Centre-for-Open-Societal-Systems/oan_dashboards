@@ -1,9 +1,5 @@
-// server/dashboard-services.ts
-//
-// Registry data reaches the dashboards through per-registry dashboard services:
-// small read-only APIs, one per registry, that own their database access and
-// expose aggregate chart data. The BFF holds no registry database credentials;
-// it only knows each service's base URL and which chart IDs it serves.
+// Public A2C and Grievance aggregate services. The BFF has no registry client
+// or database credentials; this catalog is the complete route allowlist.
 //
 // Every service implements the same contract:
 //   GET <baseUrl>/api/v1/charts/<chartId>?<filters>  ->  JSON array of rows
@@ -57,45 +53,10 @@ export interface DashboardService {
   adapter?: ServiceAdapter
 }
 
-const GEO_FILTERS = ['region', 'zone', 'woreda', 'kebele'] as const satisfies readonly FilterName[]
 
-// To add a registry: deploy its dashboard service, add an entry here, and set
+// Only A2C and Grievance belong here. Set
 // its URL variable. A service whose URL is not set is treated as unavailable.
 export const DASHBOARD_SERVICES: readonly DashboardService[] = [
-  {
-    id: 'farmer-registry',
-    urlEnv: 'FARMER_REGISTRY_DASHBOARD_API_URL',
-    filters: [...GEO_FILTERS, 'farmingType', 'recordState'],
-    charts: [
-      'farmerKpis', 'farmersByRegion', 'farmersByZone', 'farmersByWoreda', 'farmersByKebele',
-      'farmersByFarmerId', 'farmersByGender', 'farmersByType',
-      'farmersByAgeAndGender', 'farmersByEducation', 'landTenureSplit',
-      'registryTrendByMonth', 'registryCoverage', 'farmersByRecordState',
-      'farmersByImportStatus', 'farmersByPsnpStatus',
-    ],
-  },
-  {
-    id: 'livestock-registry',
-    urlEnv: 'LIVESTOCK_REGISTRY_DASHBOARD_API_URL',
-    filters: [...GEO_FILTERS, 'recordState'],
-    charts: [
-      'livestockKpis', 'livestockBySpecies', 'livestockByBreed',
-      'livestockKeepersByRegion', 'livestockKeepersByZone', 'livestockKeepersByWoreda', 'livestockKeepersByKebele',
-      'livestockTopWoredas', 'herdHealthSplit', 'livestockVaccinationStatus', 'livestockBySex',
-      'livestockTrendByMonth', 'livestockByState', 'livestockByRecordState',
-    ],
-  },
-  {
-    id: 'cropsown-registry',
-    urlEnv: 'CROPSOWN_REGISTRY_DASHBOARD_API_URL',
-    filters: [...GEO_FILTERS, 'recordState'],
-    charts: [
-      'cropKpis', 'cropAreaByCrop',
-      'cropAreaByRegion', 'cropAreaByZone', 'cropAreaByWoreda', 'cropAreaByKebele',
-      'cropTopWoredas', 'cropLandTenureSplit', 'cropBySeason', 'cropTrendByMonth',
-      'cropByStatus', 'cropByLifecycleStage', 'cropByRecordState',
-    ],
-  },
   {
     // Access to Credit, served by the A2C platform itself. It keeps locations as
     // names rather than P-codes, so its adapter maps them onto the boundaries.
@@ -216,8 +177,8 @@ async function fetchRows(
 // Next bundles instrumentation.ts (which warms the cache) separately from the
 // route handlers (which read it), so a module-level instance would exist twice.
 // Keep one per process on globalThis.
-const holder = globalThis as typeof globalThis & { __dashboardServiceCache?: ReturnType<typeof createCache> }
-const cache = (holder.__dashboardServiceCache ??= createCache())
+const holder = globalThis as typeof globalThis & { __a2cGrievanceServiceCache?: ReturnType<typeof createCache> }
+const cache = (holder.__a2cGrievanceServiceCache ??= createCache())
 
 /** Whether the service with this id is declared and has its URL variable set. */
 export function serviceConfigured(id: string): boolean {
