@@ -155,7 +155,7 @@ function ProviderPill({ status }: { status: string }) {
 
   return (
     <span
-      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9.5px] font-bold"
+      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[11px] font-bold"
       style={{ background: style.background, color: style.color }}
     >
       <span className="h-1.5 w-1.5 flex-none rounded-full" style={{ background: style.dot }} />
@@ -344,7 +344,7 @@ export function A2CDashboard({
   if (error) {
     return (
       <RegistryCard title="A2C — Access to Credit">
-        <div className="px-4 pb-5 pt-3 text-[12px]" style={{ color: REGISTRY_COLORS.red }}>
+        <div className="px-4 pb-5 pt-3 text-xs" style={{ color: REGISTRY_COLORS.red }}>
           Failed to load A2C data: {error}
         </div>
       </RegistryCard>
@@ -459,7 +459,7 @@ export function A2CDashboard({
               ? "Loading loan distribution…"
               : `Approved value by location · ${formatFull(woredasCovered)} woreda${woredasCovered === 1 ? "" : "s"} · click to drill down`
           }
-          className="flex min-h-[260px] flex-col overflow-hidden @[860px]:min-h-0"
+          className="flex min-h-[300px] flex-col overflow-hidden @[860px]:min-h-0"
           bodyClassName="relative min-h-0 flex-1"
         >
           <MapWhenVisible
@@ -531,7 +531,7 @@ export function A2CDashboard({
           title="Credit Pipeline"
           subtitle="Conversion at each consent gate"
           className="flex min-h-0 flex-col"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[10px] px-3 pb-2.5 pt-2"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-2 px-3 pb-2.5 pt-2"
         >
           <SegmentRow
             icon={<FileClock className="h-3.5 w-3.5" />}
@@ -577,7 +577,7 @@ export function A2CDashboard({
           iconColor={BRIGHT.blue}
           title="Onboarded Credit Providers"
           subtitle={`${formatFull(providersOnboarded)} live lenders · ${formatFull(providersOnboarding)} in integration`}
-          className="flex min-h-[240px] flex-col overflow-hidden @[860px]:min-h-0"
+          className="flex min-h-[220px] flex-col overflow-hidden @[860px]:min-h-0"
           bodyClassName="min-h-0 flex-1 overflow-hidden px-3 pb-2 pt-1"
         >
           {providers.length === 0 ? (
@@ -585,7 +585,7 @@ export function A2CDashboard({
           ) : (
             <div>
               <div
-                className="grid grid-cols-[minmax(0,1.5fr)_44px_44px_66px_46px_auto] gap-2 border-b pb-1 text-[9.5px]"
+                className="grid grid-cols-[minmax(0,1.5fr)_44px_44px_66px_46px_auto] gap-2 border-b pb-1 text-[11px]"
                 style={{ borderColor: REGISTRY_COLORS.line2, color: REGISTRY_COLORS.muted }}
               >
                 <span>Provider</span>
@@ -598,12 +598,12 @@ export function A2CDashboard({
               {providers.map((row: any) => (
                 <div
                   key={row.name}
-                  className="grid grid-cols-[minmax(0,1.5fr)_44px_44px_66px_46px_auto] items-center gap-2 py-[3px] text-[10.5px]"
+                  className="grid grid-cols-[minmax(0,1.5fr)_44px_44px_66px_46px_auto] items-center gap-2 py-[3px] text-[11px]"
                   style={{ color: REGISTRY_COLORS.ink2 }}
                 >
                   <span className="flex min-w-0 items-baseline gap-1.5">
                     <span
-                      className="grid h-4 w-4 flex-none self-center place-items-center rounded-[5px]"
+                      className="grid h-4 w-4 flex-none self-center place-items-center rounded"
                       style={{
                         background: row.status === "ACTIVE" ? BRIGHT_SOFT.blue : BRIGHT_SOFT.amber,
                         color: row.status === "ACTIVE" ? BRIGHT.blue : BRIGHT.amber,
@@ -618,7 +618,7 @@ export function A2CDashboard({
                     >
                       {row.shortName}
                     </span>
-                    <span className="truncate text-[9px]" style={{ color: REGISTRY_COLORS.muted }}>
+                    <span className="truncate text-[11px]" style={{ color: REGISTRY_COLORS.muted }}>
                       {row.providerType}
                     </span>
                   </span>
@@ -650,7 +650,7 @@ export function A2CDashboard({
           subtitle={`${formatFull(dataSharesFailed)} payloads failed of ${formatFull(dataSharesTotal)} sent`}
           actions={<CriticalCountChip count={shareFaults.length} noun="failing" />}
           className="flex min-h-0 flex-col overflow-hidden"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[5px] px-2.5 pb-2 pt-1.5"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-1 px-2.5 pb-2 pt-1.5"
         >
           {shareFaults.length === 0 ? (
             <EmptyPanel message="Every registry payload delivered" />
@@ -666,7 +666,7 @@ export function A2CDashboard({
                 />
               ))}
               {shareFaults.length > 5 && (
-                <span className="px-1 text-[9.5px]" style={{ color: REGISTRY_COLORS.muted }}>
+                <span className="px-1 text-[11px]" style={{ color: REGISTRY_COLORS.muted }}>
                   +{shareFaults.length - 5} further delivery failures
                 </span>
               )}
@@ -681,7 +681,7 @@ export function A2CDashboard({
           iconColor={BRIGHT.blue}
           title="Applications & Approvals"
           subtitle="Loan applications lodged per month"
-          className="flex min-h-[200px] flex-col @[860px]:min-h-0"
+          className="flex min-h-[220px] flex-col @[860px]:min-h-0"
           bodyClassName="min-h-0 flex-1 px-1 pb-1 pt-1"
         >
           {trend.length === 0 ? (
@@ -756,7 +756,7 @@ export function A2CDashboard({
           title="Programme Locations"
           subtitle={`${formatFull(farmersEnrolled)} farmers enrolled across ${formatFull(woredasCovered)} woredas`}
           className="flex min-h-0 flex-col overflow-hidden"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[7px] px-3 pb-2.5 pt-2"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-2 px-3 pb-2.5 pt-2"
         >
           {locations.length === 0 ? (
             <EmptyPanel message="No enrolled locations" />
@@ -784,7 +784,7 @@ export function A2CDashboard({
           title="Loan Products"
           subtitle={`${etb(productValueTotal)} approved across ${formatFull(products.length)} products`}
           className="flex min-h-0 flex-col overflow-hidden"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[7px] px-3 pb-2.5 pt-2"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-2 px-3 pb-2.5 pt-2"
         >
           {products.length === 0 ? (
             <EmptyPanel message="No loan products" />
@@ -812,7 +812,7 @@ export function A2CDashboard({
           title="Registry Datasets Shared"
           subtitle={`${formatFull(recordsShared)} records delivered to lenders`}
           className="flex min-h-0 flex-col overflow-hidden"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[7px] px-3 pb-2.5 pt-2"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-2 px-3 pb-2.5 pt-2"
         >
           {datasets.length === 0 ? (
             <EmptyPanel message="No datasets shared" />
@@ -841,7 +841,7 @@ export function A2CDashboard({
           subtitle={`${formatFull(loansDeclined)} declined · ${formatFull(loansPending)} awaiting a decision`}
           actions={<CriticalCountChip count={loansDeclined} noun="declined" />}
           className="flex min-h-0 flex-col overflow-hidden"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[7px] px-3 pb-2.5 pt-2"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-2 px-3 pb-2.5 pt-2"
         >
           {declineReasons.length === 0 ? (
             <EmptyPanel message="No declined applications" />
