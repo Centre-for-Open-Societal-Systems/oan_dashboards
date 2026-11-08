@@ -146,7 +146,7 @@ export function LivestockDashboard({
   if (error) {
     return (
       <RegistryCard title="Livestock Registry">
-        <div className="px-4 pb-5 pt-3 text-[12px]" style={{ color: REGISTRY_COLORS.red }}>
+        <div className="px-4 pb-5 pt-3 text-xs" style={{ color: REGISTRY_COLORS.red }}>
           Failed to load registry data: {error}
         </div>
       </RegistryCard>
@@ -240,7 +240,7 @@ export function LivestockDashboard({
               ? "Loading coverage…"
               : `${formatFull(woredasReporting)} woreda${woredasReporting === 1 ? "" : "s"} reporting · click to drill down`
           }
-          className="flex min-h-[260px] flex-col overflow-hidden @[860px]:min-h-0"
+          className="flex min-h-[300px] flex-col overflow-hidden @[860px]:min-h-0"
           bodyClassName="relative min-h-0 flex-1"
         >
           <MapWhenVisible
@@ -304,7 +304,7 @@ export function LivestockDashboard({
         <RegistryCard
           dense
           title="Top Woredas"
-          className="flex min-h-[200px] flex-col overflow-hidden @[860px]:min-h-0"
+          className="flex min-h-[220px] flex-col overflow-hidden @[860px]:min-h-0"
           bodyClassName="flex min-h-0 flex-1 flex-col"
         >
           <RankList dense items={topWoredas} nameHeader="Woreda" valueHeader="Keepers" />
@@ -371,7 +371,7 @@ export function LivestockDashboard({
 
       {/* Source ribbon */}
       <div
-        className="flex flex-none items-center gap-2 rounded-xl border bg-white px-4 py-1 text-[10.5px]"
+        className="flex flex-none items-center gap-2 rounded-xl border bg-white px-4 py-1 text-[11px]"
         style={{ borderColor: REGISTRY_COLORS.line, color: REGISTRY_COLORS.muted }}
       >
         <Layers className="h-3.5 w-3.5 flex-none" style={{ color: BRIGHT.teal }} />

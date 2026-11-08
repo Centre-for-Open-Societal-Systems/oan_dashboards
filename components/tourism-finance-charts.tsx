@@ -135,7 +135,7 @@ export function TourismFinanceCharts() {
                       color: "#7C3AED",
                     },
                   }}
-                  className="h-[350px] w-full"
+                  className="h-[300px] w-full"
                 >
                   <AreaChart data={travelServicesData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
@@ -164,7 +164,7 @@ export function TourismFinanceCharts() {
                       color: "#10B981",
                     },
                   }}
-                  className="h-[350px] w-full"
+                  className="h-[300px] w-full"
                 >
                   <BarChart data={servicesSectorData} layout="horizontal">
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />

@@ -46,7 +46,7 @@ export function EconomicIndicatorsCharts({
       <KPICards type="economic" filters={activeFilters} />
 
       <Card className="bg-red-50 border-red-200">
-        <CardContent className="p-6">
+        <CardContent className="p-4">
           <div className="text-center">
             <h3 className="text-lg font-semibold text-red-800 mb-2">Economic Indicators Not Available</h3>
             <p className="text-red-600">

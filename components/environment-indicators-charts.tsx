@@ -100,7 +100,7 @@ export function EnvironmentIndicatorsCharts({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* CO2 Emissions by Region */}
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">CO2 Emissions by Region (Tons per Capita)</h3>
             <ChartContainer
               config={{
@@ -123,7 +123,7 @@ export function EnvironmentIndicatorsCharts({
 
         {/* Forest Coverage Trends */}
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Forest Coverage Trends (%)</h3>
             <ChartContainer
               config={{
@@ -152,7 +152,7 @@ export function EnvironmentIndicatorsCharts({
 
         {/* Renewable Energy by Region */}
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Renewable Energy by Region (%)</h3>
             <ChartContainer
               config={{
@@ -175,7 +175,7 @@ export function EnvironmentIndicatorsCharts({
 
         {/* Environmental Trends */}
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Environmental Indicators Trends</h3>
             <ChartContainer
               config={{

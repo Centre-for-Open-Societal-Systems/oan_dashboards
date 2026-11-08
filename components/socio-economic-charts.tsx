@@ -340,7 +340,7 @@ export function SocioEconomicCharts({ filters, onMapFilterChange, geoJsonData, i
                     female: { label: "Female Heads", color: GENDER_COLORS.female },
                     male: { label: "Male Heads", color: GENDER_COLORS.male },
                   }}
-                  className="h-[250px] w-full"
+                  className="h-[300px] w-full"
                 >
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>

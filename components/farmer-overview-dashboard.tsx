@@ -258,7 +258,7 @@ export function FarmerOverviewDashboard({
   if (error) {
     return (
       <RegistryCard title="Farmer Profile Overview">
-        <div className="px-4 pb-5 pt-3 text-[12px]" style={{ color: REGISTRY_COLORS.red }}>
+        <div className="px-4 pb-5 pt-3 text-xs" style={{ color: REGISTRY_COLORS.red }}>
           Failed to load dashboard data: {error}
         </div>
       </RegistryCard>
@@ -441,7 +441,7 @@ export function FarmerOverviewDashboard({
           dense
           title="Farmer Group Insights"
           className="flex min-h-0 flex-col"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[10px] px-3 pb-2.5 pt-2"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-2 px-3 pb-2.5 pt-2"
         >
           <SegmentRow
             icon={<UserRound className="h-3.5 w-3.5" />}
@@ -499,7 +499,7 @@ export function FarmerOverviewDashboard({
             <MiniStat value={`${share(landOwners).toFixed(0)}%`} label="Land owners" />
             <MiniStat value={`${share(femaleFarmers).toFixed(0)}%`} label="Female" />
           </div>
-          <div className="grid flex-1 content-start gap-[9px]">
+          <div className="grid flex-1 content-start gap-2">
             <ProgressRow
               icon={<Home className="h-3 w-3" />}
               label="Farmers heading a household"
@@ -566,7 +566,7 @@ export function FarmerOverviewDashboard({
                 totalValue={formatFull(woredasTotal)}
               />
               <div className="flex min-h-[68px] flex-1 flex-col gap-1 px-2 pt-0.5">
-                <span className="text-[9.5px]" style={{ color: REGISTRY_COLORS.muted }}>
+                <span className="text-[11px]" style={{ color: REGISTRY_COLORS.muted }}>
                   Share of farmers by leading region
                 </span>
                 <MiniColumnBars items={topRegionBars} color={BRIGHT.teal} />
@@ -595,7 +595,7 @@ export function FarmerOverviewDashboard({
           {ageRows.length === 0 ? (
             <EmptyPanel message="No age data" />
           ) : (
-            <div className="grid flex-1 content-start gap-[9px]">
+            <div className="grid flex-1 content-start gap-2">
               {ageRows.map((row) => (
                 <ProgressRow
                   key={row.name}
@@ -629,11 +629,11 @@ export function FarmerOverviewDashboard({
                     ha
                   </span>
                 </div>
-                <div className="mt-0.5 text-[10px]" style={{ color: REGISTRY_COLORS.muted }}>
+                <div className="mt-0.5 text-[11px]" style={{ color: REGISTRY_COLORS.muted }}>
                   {formatFull(tenureParcels)} parcels registered
                 </div>
               </div>
-              <div className="grid flex-1 content-start gap-[9px]">
+              <div className="grid flex-1 content-start gap-2">
                 {tenureSegments.map((segment: { name: string; value: number; area: number; color: string }) => (
                   <ProgressRow
                     key={segment.name}

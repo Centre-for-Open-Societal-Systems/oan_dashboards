@@ -109,7 +109,7 @@ export function InstitutionsIndicatorsCharts({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Governance Effectiveness by Region */}
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Governance Effectiveness by Region</h3>
             <ChartContainer
               config={{
@@ -132,7 +132,7 @@ export function InstitutionsIndicatorsCharts({
 
         {/* Corruption Index Trends */}
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Corruption Index Trends (Lower is Better)</h3>
             <ChartContainer
               config={{
@@ -161,7 +161,7 @@ export function InstitutionsIndicatorsCharts({
 
         {/* Rule of Law by Region */}
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Rule of Law by Region (%)</h3>
             <ChartContainer
               config={{
@@ -184,7 +184,7 @@ export function InstitutionsIndicatorsCharts({
 
         {/* Institutional Quality Radar */}
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Institutional Quality Overview</h3>
             <ChartContainer
               config={{

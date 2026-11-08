@@ -184,7 +184,7 @@ function HealthPill({ status }: { status: string }) {
 
   return (
     <span
-      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9.5px] font-bold"
+      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[11px] font-bold"
       style={{ background: tone.bg, color: tone.color }}
     >
       <span className="h-1.5 w-1.5 flex-none rounded-full" style={{ background: tone.dot }} />
@@ -198,7 +198,7 @@ function PipelinePill({ status }: { status: string }) {
 
   return (
     <span
-      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9.5px] font-bold"
+      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[11px] font-bold"
       style={{ background: tone.bg, color: tone.color }}
     >
       <span className="h-1.5 w-1.5 flex-none rounded-full" style={{ background: tone.dot }} />
@@ -445,7 +445,7 @@ export function DevOpsDashboard() {
   if (error) {
     return (
       <RegistryCard title="DevOps — Infrastructure Monitoring">
-        <div className="px-4 pb-5 pt-3 text-[12px]" style={{ color: REGISTRY_COLORS.red }}>
+        <div className="px-4 pb-5 pt-3 text-xs" style={{ color: REGISTRY_COLORS.red }}>
           Failed to load DevOps data: {error}
         </div>
       </RegistryCard>
@@ -549,7 +549,7 @@ export function DevOpsDashboard() {
           iconColor={BRIGHT.blue}
           title="Registry Instances & Services"
           subtitle={`${formatFull(registries)} registries and ${formatFull(services)} services · instances, databases and APIs per platform`}
-          className="flex min-h-[260px] flex-col overflow-hidden @[860px]:min-h-0"
+          className="flex min-h-[300px] flex-col overflow-hidden @[860px]:min-h-0"
           bodyClassName="min-h-0 flex-1 overflow-hidden px-3 pb-2 pt-1"
         >
           {platforms.length === 0 ? (
@@ -557,7 +557,7 @@ export function DevOpsDashboard() {
           ) : (
             <div>
               <div
-                className="grid grid-cols-[minmax(0,1.6fr)_44px_32px_52px_50px_44px_auto] gap-2 border-b pb-1 text-[9.5px]"
+                className="grid grid-cols-[minmax(0,1.6fr)_44px_32px_52px_50px_44px_auto] gap-2 border-b pb-1 text-[11px]"
                 style={{ borderColor: REGISTRY_COLORS.line2, color: REGISTRY_COLORS.muted }}
               >
                 <span>Platform</span>
@@ -571,12 +571,12 @@ export function DevOpsDashboard() {
               {platforms.map((row: any) => (
                 <div
                   key={row.key}
-                  className="grid grid-cols-[minmax(0,1.6fr)_44px_32px_52px_50px_44px_auto] items-center gap-2 py-[3px] text-[10.5px]"
+                  className="grid grid-cols-[minmax(0,1.6fr)_44px_32px_52px_50px_44px_auto] items-center gap-2 py-[3px] text-[11px]"
                   style={{ color: REGISTRY_COLORS.ink2 }}
                 >
                   <span className="flex min-w-0 items-baseline gap-1.5">
                     <span
-                      className="grid h-4 w-4 flex-none place-items-center self-center rounded-[5px]"
+                      className="grid h-4 w-4 flex-none place-items-center self-center rounded"
                       style={{
                         background: row.kind === "REGISTRY" ? BRIGHT_SOFT.blue : BRIGHT_SOFT.teal,
                         color: row.kind === "REGISTRY" ? BRIGHT.blue : BRIGHT.teal,
@@ -591,7 +591,7 @@ export function DevOpsDashboard() {
                     >
                       {row.shortName}
                     </span>
-                    <span className="truncate text-[9px]" style={{ color: REGISTRY_COLORS.muted }}>
+                    <span className="truncate text-[11px]" style={{ color: REGISTRY_COLORS.muted }}>
                       {row.kind === "REGISTRY" ? "Registry" : "Service"} · {row.tier}
                     </span>
                   </span>
@@ -741,7 +741,7 @@ export function DevOpsDashboard() {
           title="API Surface"
           subtitle="Internal exchange versus partner-facing"
           className="flex min-h-0 flex-col"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[10px] px-3 pb-2.5 pt-2"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-2 px-3 pb-2.5 pt-2"
         >
           <SegmentRow
             icon={<Network className="h-3.5 w-3.5" />}
@@ -788,7 +788,7 @@ export function DevOpsDashboard() {
           title="Deployment Pipelines"
           subtitle={`${formatFull(pipelinesTotal)} pipelines · ${formatFull(pipelinesRunning)} running · ${deploySuccessRate.toFixed(1)}% of runs pass`}
           actions={<CriticalCountChip count={pipelinesFailed} noun="failing" />}
-          className="flex min-h-[240px] flex-col overflow-hidden @[860px]:min-h-0"
+          className="flex min-h-[220px] flex-col overflow-hidden @[860px]:min-h-0"
           bodyClassName="min-h-0 flex-1 overflow-hidden px-3 pb-2 pt-1"
         >
           {pipelines.length === 0 ? (
@@ -796,7 +796,7 @@ export function DevOpsDashboard() {
           ) : (
             <div>
               <div
-                className="grid grid-cols-[minmax(0,1.7fr)_38px_72px_44px_auto] gap-2 border-b pb-1 text-[9.5px]"
+                className="grid grid-cols-[minmax(0,1.7fr)_38px_72px_44px_auto] gap-2 border-b pb-1 text-[11px]"
                 style={{ borderColor: REGISTRY_COLORS.line2, color: REGISTRY_COLORS.muted }}
               >
                 <span>Pipeline</span>
@@ -808,12 +808,12 @@ export function DevOpsDashboard() {
               {pipelines.map((row: any) => (
                 <div
                   key={row.name}
-                  className="grid grid-cols-[minmax(0,1.7fr)_38px_72px_44px_auto] items-center gap-2 py-[2px] text-[10.5px]"
+                  className="grid grid-cols-[minmax(0,1.7fr)_38px_72px_44px_auto] items-center gap-2 py-[2px] text-[11px]"
                   style={{ color: REGISTRY_COLORS.ink2 }}
                 >
                   <span className="flex min-w-0 items-baseline gap-1.5">
                     <span
-                      className="grid h-4 w-4 flex-none place-items-center self-center rounded-[5px]"
+                      className="grid h-4 w-4 flex-none place-items-center self-center rounded"
                       style={{
                         background: row.lastStatus === "FAILED" ? BRIGHT_SOFT.red : BRIGHT_SOFT.violet,
                         color: row.lastStatus === "FAILED" ? BRIGHT.crimson : BRIGHT.violet,
@@ -828,7 +828,7 @@ export function DevOpsDashboard() {
                     >
                       {row.name}
                     </span>
-                    <span className="truncate text-[9px]" style={{ color: REGISTRY_COLORS.muted }}>
+                    <span className="truncate text-[11px]" style={{ color: REGISTRY_COLORS.muted }}>
                       {row.failedStage || row.platformShort}
                     </span>
                   </span>
@@ -838,7 +838,7 @@ export function DevOpsDashboard() {
                   >
                     {row.successRate.toFixed(0)}%
                   </span>
-                  <span className="whitespace-nowrap text-right text-[9.5px]">{timestamp(row.lastRunAt)}</span>
+                  <span className="whitespace-nowrap text-right text-[11px]">{timestamp(row.lastRunAt)}</span>
                   <span className="text-right">{duration(row.lastDuration)}</span>
                   <span className="text-right">
                     <PipelinePill status={row.lastStatus} />
@@ -858,7 +858,7 @@ export function DevOpsDashboard() {
           subtitle={`${formatFull(incidentsOpen)} open across nodes, databases, APIs and pipelines`}
           actions={<CriticalCountChip count={incidentsCritical} noun="critical" />}
           className="flex min-h-0 flex-col overflow-hidden"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[5px] px-2.5 pb-2 pt-1.5"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-1 px-2.5 pb-2 pt-1.5"
         >
           {incidents.length === 0 ? (
             <EmptyPanel message="Nothing alerting across the estate" />
@@ -886,7 +886,7 @@ export function DevOpsDashboard() {
           iconColor={BRIGHT.amber}
           title="Deploy Activity"
           subtitle="Pipeline runs per day, last 14 days"
-          className="flex min-h-[200px] flex-col @[860px]:min-h-0"
+          className="flex min-h-[220px] flex-col @[860px]:min-h-0"
           bodyClassName="min-h-0 flex-1 px-1 pb-1 pt-1"
         >
           {pipelineTrend.length === 0 ? (
@@ -962,7 +962,7 @@ export function DevOpsDashboard() {
           subtitle={`${formatFull(nodesTotal)} nodes · ${clusterNote || "no clusters"} · ${diskTb.toFixed(1)} TB disk`}
           actions={<CriticalCountChip count={nodesCritical} noun="critical" />}
           className="flex min-h-0 flex-col overflow-hidden"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[7px] px-3 pb-2.5 pt-2"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-2 px-3 pb-2.5 pt-2"
         >
           {nodes.length === 0 ? (
             <EmptyPanel message="No nodes reporting" />
@@ -981,7 +981,7 @@ export function DevOpsDashboard() {
                 />
               ))}
               {nodes.length > 7 && (
-                <span className="px-1 text-[9.5px]" style={{ color: REGISTRY_COLORS.muted }}>
+                <span className="px-1 text-[11px]" style={{ color: REGISTRY_COLORS.muted }}>
                   +{nodes.length - 7} further nodes · {formatFull(nodesHealthy)} healthy,{" "}
                   {formatFull(nodesWarning)} warning · avg {avgCpu.toFixed(0)}% CPU, {avgMemory.toFixed(0)}% memory,{" "}
                   {avgDisk.toFixed(0)}% disk
@@ -999,7 +999,7 @@ export function DevOpsDashboard() {
           title="Postgres Connection Load"
           subtitle={`${formatFull(databasesTotal)} databases · ${formatFull(databasesTotal - databasesHealthy)} off nominal`}
           className="flex min-h-0 flex-col overflow-hidden"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[7px] px-3 pb-2.5 pt-2"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-2 px-3 pb-2.5 pt-2"
         >
           {databases.length === 0 ? (
             <EmptyPanel message="No databases reporting" />
@@ -1022,7 +1022,7 @@ export function DevOpsDashboard() {
                 />
               ))}
               {databases.length > 7 && (
-                <span className="px-1 text-[9.5px]" style={{ color: REGISTRY_COLORS.muted }}>
+                <span className="px-1 text-[11px]" style={{ color: REGISTRY_COLORS.muted }}>
                   +{databases.length - 7} further databases · {formatCompact(databaseSizeGb)} GB across primaries
                 </span>
               )}
@@ -1039,7 +1039,7 @@ export function DevOpsDashboard() {
           subtitle="Highest error rate first, internal and external"
           actions={<CriticalCountChip count={apisDegraded} noun="degraded" />}
           className="flex min-h-0 flex-col overflow-hidden"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[7px] px-3 pb-2.5 pt-2"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-2 px-3 pb-2.5 pt-2"
         >
           {apiHotspots.length === 0 ? (
             <EmptyPanel message="No endpoints reporting" />
@@ -1067,7 +1067,7 @@ export function DevOpsDashboard() {
           title="Deploy Cadence"
           subtitle={`${formatFull(deploys30d)} deploys in 30 days`}
           className="flex min-h-0 flex-col overflow-hidden"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[7px] px-3 pb-2.5 pt-2"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-2 px-3 pb-2.5 pt-2"
         >
           {deployFrequency.length === 0 ? (
             <EmptyPanel message="No deploy history" />

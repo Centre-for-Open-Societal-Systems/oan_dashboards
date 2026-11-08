@@ -288,7 +288,7 @@ export function LandCharts({ filters, onMapFilterChange, geoJsonData, initialDat
         <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Land Area by Region - Bar Chart */}
           <Card className="border border-white/20 dark:border-white/5 bg-white/60 dark:bg-card/40 backdrop-blur-xl rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
-            <CardContent className="p-6 w-full min-w-0">
+            <CardContent className="p-4 w-full min-w-0">
               <h3 className="text-sm text-center  text-muted-foreground mb-3">Land Area by Region</h3>
               {loading ? (
                 <div className="h-[300px] flex items-center justify-center">
@@ -340,7 +340,7 @@ export function LandCharts({ filters, onMapFilterChange, geoJsonData, initialDat
 
           {/* Land Ownership Distribution - Pie Chart */}
           <Card className="border border-white/20 dark:border-white/5 bg-white/60 dark:bg-card/40 backdrop-blur-xl rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
-            <CardContent className="p-6">
+            <CardContent className="p-4">
               <h3 className="text-sm text-center  text-muted-foreground mb-3">Land Ownership Distribution</h3>
               {loading ? (
                 <div className="h-[300px] flex items-center justify-center">
@@ -354,7 +354,7 @@ export function LandCharts({ filters, onMapFilterChange, geoJsonData, initialDat
                         owned: { label: "Farmland Owned", color: CHART_COLORS.primary },
                         rented: { label: "Farmland Rented", color: CHART_COLORS.secondary },
                       }}
-                      className="h-[250px] w-full"
+                      className="h-[300px] w-full"
                     >
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -399,7 +399,7 @@ export function LandCharts({ filters, onMapFilterChange, geoJsonData, initialDat
       {/* Charts beneath the map */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-6 mt-4">
         <Card className="border border-white/20 dark:border-white/5 bg-white/60 dark:bg-card/40 backdrop-blur-xl rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-sm text-center  text-muted-foreground mb-3">Average Farm Size by Region</h3>
             {loading ? (
               <div className="h-[300px] flex items-center justify-center">
@@ -438,7 +438,7 @@ export function LandCharts({ filters, onMapFilterChange, geoJsonData, initialDat
         </Card>
 
         <Card className="border border-white/20 dark:border-white/5 bg-white/60 dark:bg-card/40 backdrop-blur-xl rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-sm text-center  text-muted-foreground mb-3">Farmers by Age Group and Gender</h3>
             {loading ? (
               <div className="h-[300px] flex items-center justify-center">

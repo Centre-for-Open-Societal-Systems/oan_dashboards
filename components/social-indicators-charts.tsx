@@ -203,7 +203,7 @@ export function SocialIndicatorsCharts({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Education by Gender */}
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Education Access by Gender (%)</h3>
             <ChartContainer
               config={{
@@ -233,7 +233,7 @@ export function SocialIndicatorsCharts({
 
         {/* Health by Region */}
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Health Access by Region (%)</h3>
             <ChartContainer
               config={{
@@ -257,7 +257,7 @@ export function SocialIndicatorsCharts({
 
         {/* Employment Trends */}
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Employment Rate Trends (%)</h3>
             <ChartContainer
               config={{
@@ -282,7 +282,7 @@ export function SocialIndicatorsCharts({
 
         {/* Literacy by Gender */}
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Literacy Rate by Gender (%)</h3>
             <ChartContainer
               config={{
@@ -321,9 +321,9 @@ export function SocialIndicatorsCharts({
 
    {/* Life Expectancy */}
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Life Expectancy at Birth (Years)</h3>
-            <ChartContainer config={{}} className="h-[250px] w-full">
+            <ChartContainer config={{}} className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={lifeExpectancyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
@@ -343,9 +343,9 @@ export function SocialIndicatorsCharts({
 
         {/* Poverty Rate
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Poverty Rate</h3>
-            <ChartContainer config={{}} className="h-[250px] w-full">
+            <ChartContainer config={{}} className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={povertyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
@@ -363,9 +363,9 @@ export function SocialIndicatorsCharts({
 
         {/* Internet Access */}
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Internet Access (% of Population)</h3>
-            <ChartContainer config={{}} className="h-[250px] w-full">
+            <ChartContainer config={{}} className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={internetAccessData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
@@ -384,9 +384,9 @@ export function SocialIndicatorsCharts({
         
         {/* Human Capital Index */}
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Human Capital Index (Scale 0-1)</h3>
-            <ChartContainer config={{}} className="h-[250px] w-full">
+            <ChartContainer config={{}} className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={humanCapitalData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
@@ -406,9 +406,9 @@ export function SocialIndicatorsCharts({
 
         {/* Literacy Rate (Grouped Bar Chart) */}
         <Card className="bg-white shadow-lg border border-amber-200">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Literacy Rate (% of population 15+)</h3>
-            <ChartContainer config={{}} className="h-[250px] w-full">
+            <ChartContainer config={{}} className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={literacyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />

@@ -292,7 +292,7 @@ export function DemographyCharts({ filters, onMapFilterChange, geoJsonData, init
         <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Population by Region - Bar Chart */}
           <Card className="border border-white/20 dark:border-white/5 bg-white/60 dark:bg-card/40 backdrop-blur-xl rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
-            <CardContent className="p-6 w-full min-w-0">
+            <CardContent className="p-4 w-full min-w-0">
               <h3 className="text-sm text-center  text-muted-foreground mb-3">Farmer Population by Region</h3>
             {loading ? (
               <div className="h-[300px] flex items-center justify-center">
@@ -306,7 +306,7 @@ export function DemographyCharts({ filters, onMapFilterChange, geoJsonData, init
                     color: CHART_COLORS.primary,
                   },
                 }}
-                className="h-[260px] w-full"
+                className="h-[300px] w-full"
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={populationByRegionChartData} margin={{ top: 20, right: 5, left: -20, bottom: 5 }}>
@@ -344,7 +344,7 @@ export function DemographyCharts({ filters, onMapFilterChange, geoJsonData, init
 
         {/* Male and Female Farmers by Region - Stacked Bar Chart */}
         <Card className="border border-white/20 dark:border-white/5 bg-white/60 dark:bg-card/40 backdrop-blur-xl rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-sm text-center  text-muted-foreground mb-3">Male and Female Farmers by Region</h3>
             {loading ? (
               <div className="h-[300px] flex items-center justify-center">
@@ -359,7 +359,7 @@ export function DemographyCharts({ filters, onMapFilterChange, geoJsonData, init
                       male: { label: "Male Farmers", color: CHART_COLORS.primary },
                       female: { label: "Female Farmers", color: CHART_COLORS.secondary },
                     }}
-                    className="h-[260px] w-full"
+                    className="h-[300px] w-full"
                   >
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={genderByRegionChartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
@@ -417,7 +417,7 @@ export function DemographyCharts({ filters, onMapFilterChange, geoJsonData, init
       {/* Charts beneath the map */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4">
         <Card className="border border-white/20 dark:border-white/5 bg-white/60 dark:bg-card/40 backdrop-blur-xl rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-sm text-center  text-muted-foreground mb-3">Farmers by Education Level</h3>
             <ChartContainer
               config={{
@@ -450,7 +450,7 @@ export function DemographyCharts({ filters, onMapFilterChange, geoJsonData, init
         </Card>
 
         <Card className="border border-white/20 dark:border-white/5 bg-white/60 dark:bg-card/40 backdrop-blur-xl rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="text-sm text-center  text-muted-foreground mb-3">Age Distribution and Gender</h3>
             {loading ? (
               <div className="h-[300px] flex items-center justify-center">

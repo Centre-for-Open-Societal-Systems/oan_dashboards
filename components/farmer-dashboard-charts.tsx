@@ -172,7 +172,7 @@ export function FarmerDashboardCharts({ filters, onMapFilterChange, geoJsonData,
     return (
       <div className="space-y-6">
         <Card className="shadow-lg border-0">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="text-center text-red-600">
               <p className="text-lg font-semibold">Error loading dashboard data</p>
               <p className="text-sm">{errorMessage}</p>
@@ -329,11 +329,11 @@ export function FarmerDashboardCharts({ filters, onMapFilterChange, geoJsonData,
               <h4 className="text-sm text-center  text-muted-foreground mb-3">Farmers in Regions</h4>
 
               {loading ? (
-                <div className="h-[250px] flex items-center justify-center">
+                <div className="h-[300px] flex items-center justify-center">
                   <div className="text-gray-500">Loading...</div>
                 </div>
               ) : errorMessage ? (
-                <div className="h-[250px] flex items-center justify-center bg-red-50 border border-red-200 rounded">
+                <div className="h-[300px] flex items-center justify-center bg-red-50 border border-red-200 rounded">
                   <div className="text-center">
                     <div className="text-red-600 font-semibold mb-2">Query Failed</div>
                     <div className="text-sm text-red-500">{errorMessage}</div>
@@ -395,7 +395,7 @@ export function FarmerDashboardCharts({ filters, onMapFilterChange, geoJsonData,
                     crop: { label: "Crop Farming", color: CHART_COLORS.primary },
                     mixed: { label: "Mixed Farming", color: CHART_COLORS.warning },
                   }}
-                  className="h-[200px] w-full"
+                  className="h-[220px] w-full"
                 >
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>

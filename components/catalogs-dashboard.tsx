@@ -139,7 +139,7 @@ function HealthPill({ faults, connected }: { faults: number; connected: boolean 
 
   return (
     <span
-      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9.5px] font-bold"
+      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[11px] font-bold"
       style={{ background: style.background, color: style.color }}
     >
       <span className="h-1.5 w-1.5 flex-none rounded-full" style={{ background: style.dot }} />
@@ -344,7 +344,7 @@ export function CatalogsDashboard() {
   if (error) {
     return (
       <RegistryCard title="Catalogs">
-        <div className="px-4 pb-5 pt-3 text-[12px]" style={{ color: REGISTRY_COLORS.red }}>
+        <div className="px-4 pb-5 pt-3 text-xs" style={{ color: REGISTRY_COLORS.red }}>
           Failed to load catalog data: {error}
         </div>
       </RegistryCard>
@@ -427,7 +427,7 @@ export function CatalogsDashboard() {
           iconColor={BRIGHT.teal}
           title="Connected Registries"
           subtitle="Sources feeding the catalogues, with live fault checks"
-          className="flex min-h-[240px] flex-col overflow-hidden @[860px]:min-h-0"
+          className="flex min-h-[220px] flex-col overflow-hidden @[860px]:min-h-0"
           bodyClassName="min-h-0 flex-1 overflow-hidden px-3 pb-2 pt-1"
         >
           {sources.length === 0 ? (
@@ -435,7 +435,7 @@ export function CatalogsDashboard() {
           ) : (
             <div>
               <div
-                className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,1.15fr)_58px_52px_auto] gap-2 border-b pb-1 text-[9.5px]"
+                className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,1.15fr)_58px_52px_auto] gap-2 border-b pb-1 text-[11px]"
                 style={{ borderColor: REGISTRY_COLORS.line2, color: REGISTRY_COLORS.muted }}
               >
                 <span>Registry</span>
@@ -447,12 +447,12 @@ export function CatalogsDashboard() {
               {sources.map((source) => (
                 <div
                   key={source.key}
-                  className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,1.15fr)_58px_52px_auto] items-center gap-2 py-[5px] text-[10.5px]"
+                  className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,1.15fr)_58px_52px_auto] items-center gap-2 py-[5px] text-[11px]"
                   style={{ color: REGISTRY_COLORS.ink2 }}
                 >
                   <span className="flex min-w-0 items-center gap-1.5">
                     <span
-                      className="grid h-4 w-4 flex-none place-items-center rounded-[5px]"
+                      className="grid h-4 w-4 flex-none place-items-center rounded"
                       style={{
                         background: REGISTRY_TINTS[source.key]?.soft || BRIGHT_SOFT.blue,
                         color: REGISTRY_TINTS[source.key]?.color || BRIGHT.blue,
@@ -468,7 +468,7 @@ export function CatalogsDashboard() {
                       >
                         {source.registry}
                       </span>
-                      <span className="block truncate text-[9px]" style={{ color: REGISTRY_COLORS.muted }}>
+                      <span className="block truncate text-[11px]" style={{ color: REGISTRY_COLORS.muted }}>
                         {source.detail}
                       </span>
                     </span>
@@ -542,7 +542,7 @@ export function CatalogsDashboard() {
           iconColor={BRIGHT.violet}
           title="Catalogue Completeness"
           className="flex min-h-0 flex-col"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[10px] px-3 pb-2.5 pt-2"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-2 px-3 pb-2.5 pt-2"
         >
           <SegmentRow
             icon={<Layers className="h-3.5 w-3.5" />}
@@ -590,7 +590,7 @@ export function CatalogsDashboard() {
           subtitle={`${formatFull(affectedRecords)} records across ${faults.length} failing checks`}
           actions={<CriticalCountChip count={criticalFaults.length} />}
           className="flex min-h-0 flex-col overflow-hidden"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[5px] px-2.5 pb-2 pt-1.5"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-1 px-2.5 pb-2 pt-1.5"
         >
           {faults.length === 0 ? (
             <EmptyPanel message="All integrity checks passing" />
@@ -606,7 +606,7 @@ export function CatalogsDashboard() {
                 />
               ))}
               {faults.length > 5 && (
-                <span className="px-1 text-[9.5px]" style={{ color: REGISTRY_COLORS.muted }}>
+                <span className="px-1 text-[11px]" style={{ color: REGISTRY_COLORS.muted }}>
                   +{faults.length - 5} further checks tripped
                 </span>
               )}
@@ -629,7 +629,7 @@ export function CatalogsDashboard() {
           ) : (
             <div>
               <div
-                className="grid grid-cols-[minmax(0,1.5fr)_60px_50px_auto] gap-2 border-b pb-1 text-[9.5px]"
+                className="grid grid-cols-[minmax(0,1.5fr)_60px_50px_auto] gap-2 border-b pb-1 text-[11px]"
                 style={{ borderColor: REGISTRY_COLORS.line2, color: REGISTRY_COLORS.muted }}
               >
                 <span>System</span>
@@ -640,12 +640,12 @@ export function CatalogsDashboard() {
               {externals.map((row) => (
                 <div
                   key={row.system}
-                  className="grid grid-cols-[minmax(0,1.5fr)_60px_50px_auto] items-center gap-2 py-[5px] text-[10.5px]"
+                  className="grid grid-cols-[minmax(0,1.5fr)_60px_50px_auto] items-center gap-2 py-[5px] text-[11px]"
                   style={{ color: REGISTRY_COLORS.ink2 }}
                 >
                   <span className="flex min-w-0 items-center gap-1.5">
                     <span
-                      className="grid h-4 w-4 flex-none place-items-center rounded-[5px]"
+                      className="grid h-4 w-4 flex-none place-items-center rounded"
                       style={{ background: BRIGHT_SOFT.sky, color: BRIGHT.sky }}
                     >
                       {DOMAIN_ICONS[row.domain] || <Cloud className="h-3 w-3" />}
@@ -658,7 +658,7 @@ export function CatalogsDashboard() {
                       >
                         {row.system}
                       </span>
-                      <span className="block truncate text-[9px]" style={{ color: REGISTRY_COLORS.muted }}>
+                      <span className="block truncate text-[11px]" style={{ color: REGISTRY_COLORS.muted }}>
                         {row.endpoint} · {row.domain}
                       </span>
                     </span>
@@ -685,7 +685,7 @@ export function CatalogsDashboard() {
           iconColor={BRIGHT.green}
           title="Variety Releases"
           subtitle="Crop varieties released per year"
-          className="flex min-h-[200px] flex-col @[860px]:min-h-0"
+          className="flex min-h-[220px] flex-col @[860px]:min-h-0"
           bodyClassName="min-h-0 flex-1 px-1 pb-1 pt-1"
         >
           {varietyTimeline.length === 0 ? (
@@ -741,7 +741,7 @@ export function CatalogsDashboard() {
           title="Most Improved Crops"
           subtitle="Released varieties per crop"
           className="flex min-h-0 flex-col overflow-hidden"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[7px] px-3 pb-2.5 pt-2"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-2 px-3 pb-2.5 pt-2"
         >
           {topCrops.length === 0 ? (
             <EmptyPanel message="No variety data" />
@@ -772,7 +772,7 @@ export function CatalogsDashboard() {
           title="Seed Demand by Class"
           subtitle={`${formatCompact(seedDemandTotal)} quintals over ${formatFull(seedYears)} budget years`}
           className="flex min-h-0 flex-col overflow-hidden"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[7px] px-3 pb-2.5 pt-2"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-2 px-3 pb-2.5 pt-2"
         >
           {seedDemandByClass.length === 0 ? (
             <EmptyPanel message="No seed demand recorded" />
@@ -800,7 +800,7 @@ export function CatalogsDashboard() {
           title="Administrative Hierarchy"
           subtitle="Woredas per region, joined on P-code"
           className="flex min-h-0 flex-col overflow-hidden"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[7px] px-3 pb-2.5 pt-2"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-2 px-3 pb-2.5 pt-2"
         >
           {hierarchy.length === 0 ? (
             <EmptyPanel message="No boundary data" />
@@ -828,7 +828,7 @@ export function CatalogsDashboard() {
           title="Breeds by Origin"
           subtitle={`${formatFull(breeds)} breeds across ${formatFull(species)} species`}
           className="flex min-h-0 flex-col overflow-hidden"
-          bodyClassName="grid min-h-0 flex-1 content-start gap-[7px] px-3 pb-2.5 pt-2"
+          bodyClassName="grid min-h-0 flex-1 content-start gap-2 px-3 pb-2.5 pt-2"
         >
           {breedRows.length === 0 ? (
             <EmptyPanel message="No breed data" />
