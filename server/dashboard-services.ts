@@ -1,9 +1,5 @@
-// server/dashboard-services.ts
-//
-// Registry data reaches the dashboards through per-registry dashboard services:
-// small read-only APIs, one per registry, that own their database access and
-// expose aggregate chart data. The BFF holds no registry database credentials;
-// it only knows each service's base URL and which chart IDs it serves.
+// Public A2C and Grievance aggregate services. The BFF has no registry client
+// or database credentials; this catalog is the complete route allowlist.
 //
 // Every service implements the same contract:
 //   GET <baseUrl>/api/v1/charts/<chartId>?<filters>  ->  JSON array of rows
@@ -43,6 +39,12 @@ export interface DashboardService {
    * for a service reached through a gateway that exposes it under another prefix.
    */
   pathEnv?: string
+  /**
+   * Environment variable holding the API key the service's gateway expects
+   * (Kong key-auth, header `apikey`). Unset sends no key: the service is
+   * reached directly or its gateway does not enforce keys yet.
+   */
+  apiKeyEnv?: string
   /** Filters the service accepts. Others are not forwarded, so they do not split the cache. */
   filters: readonly FilterName[]
   /** Chart IDs this service serves. */
@@ -51,45 +53,10 @@ export interface DashboardService {
   adapter?: ServiceAdapter
 }
 
-const GEO_FILTERS = ['region', 'zone', 'woreda', 'kebele'] as const satisfies readonly FilterName[]
 
-// To add a registry: deploy its dashboard service, add an entry here, and set
+// Only A2C and Grievance belong here. Set
 // its URL variable. A service whose URL is not set is treated as unavailable.
 export const DASHBOARD_SERVICES: readonly DashboardService[] = [
-  {
-    id: 'farmer-registry',
-    urlEnv: 'FARMER_REGISTRY_DASHBOARD_API_URL',
-    filters: [...GEO_FILTERS, 'farmingType', 'recordState'],
-    charts: [
-      'farmerKpis', 'farmersByRegion', 'farmersByZone', 'farmersByWoreda', 'farmersByKebele',
-      'farmersByFarmerId', 'farmersByGender', 'farmersByType',
-      'farmersByAgeAndGender', 'farmersByEducation', 'landTenureSplit',
-      'registryTrendByMonth', 'registryCoverage', 'farmersByRecordState',
-      'farmersByImportStatus', 'farmersByPsnpStatus',
-    ],
-  },
-  {
-    id: 'livestock-registry',
-    urlEnv: 'LIVESTOCK_REGISTRY_DASHBOARD_API_URL',
-    filters: [...GEO_FILTERS, 'recordState'],
-    charts: [
-      'livestockKpis', 'livestockBySpecies', 'livestockByBreed',
-      'livestockKeepersByRegion', 'livestockKeepersByZone', 'livestockKeepersByWoreda', 'livestockKeepersByKebele',
-      'livestockTopWoredas', 'herdHealthSplit', 'livestockVaccinationStatus', 'livestockBySex',
-      'livestockTrendByMonth', 'livestockByState', 'livestockByRecordState',
-    ],
-  },
-  {
-    id: 'cropsown-registry',
-    urlEnv: 'CROPSOWN_REGISTRY_DASHBOARD_API_URL',
-    filters: [...GEO_FILTERS, 'recordState'],
-    charts: [
-      'cropKpis', 'cropAreaByCrop',
-      'cropAreaByRegion', 'cropAreaByZone', 'cropAreaByWoreda', 'cropAreaByKebele',
-      'cropTopWoredas', 'cropLandTenureSplit', 'cropBySeason', 'cropTrendByMonth',
-      'cropByStatus', 'cropByLifecycleStage', 'cropByRecordState',
-    ],
-  },
   {
     // Access to Credit, served by the A2C platform itself. It keeps locations as
     // names rather than P-codes, so its adapter maps them onto the boundaries.
@@ -97,6 +64,7 @@ export const DASHBOARD_SERVICES: readonly DashboardService[] = [
     urlEnv: 'A2C_DASHBOARD_API_URL',
     // Frappe serves the charts under /api/v1; A2C's Kong gateway exposes them as /v1.
     pathEnv: 'A2C_DASHBOARD_API_CHARTS_PATH',
+    apiKeyEnv: 'A2C_DASHBOARD_API_KEY',
     filters: ['provider', 'region', 'zone', 'woreda'],
     charts: [
       'a2cKpis', 'a2cProviders', 'a2cLocationSummary',
@@ -106,6 +74,20 @@ export const DASHBOARD_SERVICES: readonly DashboardService[] = [
       'a2cFilterProviders', 'a2cFilterLocations',
     ],
     adapter: a2cAdapter,
+  },
+  {
+    // Grievance redress, served by the grievance service from rollups it
+    // refreshes every 15 minutes. Regions are P-codes already, so no adapter.
+    id: 'grievance',
+    urlEnv: 'GRIEVANCE_DASHBOARD_API_URL',
+    apiKeyEnv: 'GRIEVANCE_DASHBOARD_API_KEY',
+    filters: ['region', 'category'],
+    charts: [
+      'grvKpis', 'grvPerformanceKpis', 'grvMonthlyTrend', 'grvWeeklyTrend', 'grvNetBacklogTrend',
+      'grvStatusDistribution', 'grvByCategory', 'grvCategoryResolution', 'grvResolutionRateByRegion',
+      'grvSlaRisk', 'grvPendingDuplicates', 'grvOldestOpen',
+      'grvFilterRegions', 'grvFilterCategories',
+    ],
   },
 ]
 
@@ -128,6 +110,13 @@ function serviceUrl(service: DashboardService): string | undefined {
 }
 
 const DEFAULT_CHARTS_PATH = '/api/v1/charts'
+
+// The key goes in a header only, is never logged, and never leaves the server
+// (no NEXT_PUBLIC_ prefix).
+function serviceHeaders(service: DashboardService): Record<string, string> {
+  const key = service.apiKeyEnv ? process.env[service.apiKeyEnv]?.trim() : undefined
+  return key ? { apikey: key } : {}
+}
 
 function chartsPath(service: DashboardService): string {
   const value = service.pathEnv ? process.env[service.pathEnv]?.trim().replace(/\/+$/, '') : undefined
@@ -153,7 +142,8 @@ const createCache = () => new LRUCache<string, Rows, FetchContext>({
         throw new Error(`${service.urlEnv} is not set`)
       }
       const root = `${base}${chartsPath(service)}`
-      const call: ServiceCall = (serviceChart, query) => fetchRows(root, serviceChart, query)
+      const headers = serviceHeaders(service)
+      const call: ServiceCall = (serviceChart, query) => fetchRows(root, serviceChart, query, headers)
       return service.adapter
         ? await service.adapter.rows(chartName, filters, call)
         : await call(chartName, params)
@@ -166,9 +156,14 @@ const createCache = () => new LRUCache<string, Rows, FetchContext>({
   },
 })
 
-async function fetchRows(root: string, chartName: string, params: Record<string, string>): Promise<Rows> {
+async function fetchRows(
+  root: string,
+  chartName: string,
+  params: Record<string, string>,
+  headers: Record<string, string> = {}
+): Promise<Rows> {
   const query = new URLSearchParams(params).toString()
-  const res = await fetch(`${root}/${encodeURIComponent(chartName)}${query ? `?${query}` : ''}`, { cache: 'no-store' })
+  const res = await fetch(`${root}/${encodeURIComponent(chartName)}${query ? `?${query}` : ''}`, { cache: 'no-store', headers })
   if (!res.ok) {
     throw new Error(`${chartName} returned ${res.status}`)
   }
@@ -182,8 +177,8 @@ async function fetchRows(root: string, chartName: string, params: Record<string,
 // Next bundles instrumentation.ts (which warms the cache) separately from the
 // route handlers (which read it), so a module-level instance would exist twice.
 // Keep one per process on globalThis.
-const holder = globalThis as typeof globalThis & { __dashboardServiceCache?: ReturnType<typeof createCache> }
-const cache = (holder.__dashboardServiceCache ??= createCache())
+const holder = globalThis as typeof globalThis & { __a2cGrievanceServiceCache?: ReturnType<typeof createCache> }
+const cache = (holder.__a2cGrievanceServiceCache ??= createCache())
 
 /** Whether the service with this id is declared and has its URL variable set. */
 export function serviceConfigured(id: string): boolean {

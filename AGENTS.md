@@ -1,82 +1,22 @@
-# AGENTS.md
+# Workspace guidance
 
-Guidance for contributors and coding agents working in this repository. Read the
-[README](README.md) and [docs/](docs/) first. This file lists the rules that are easy to get wrong.
+This is the public A2C and Grievance aggregate dashboard (Next.js with an Elysia
+BFF). Read README.md and docs before editing.
 
-## What this is
-
-A Next.js 16 (App Router, React 19) application with four dashboards: Registries, Catalogs, Access
-to Credit and DevOps. An Elysia BFF is mounted under `/api` in the same process.
-
-Registry data comes from **per-registry dashboard services**: read-only APIs, one per registry, that
-share one HTTP contract. The BFF calls them server-to-server through a shared cache. Some dashboards
-still read a transitional database directly until their services exist.
-
-## Key files
-
-```
-app/api/[[...slugs]]/route.ts   mounts the Elysia app
-server/elysia-app.ts            BFF: filter parsing, chart routing (executeChartQuery), batch endpoints
-server/dashboard-services.ts    DASHBOARD_SERVICES (id, URL variable, filters, chart IDs) + response cache
-instrumentation.ts              warms the service cache at start-up and every TTL
-lib/chart-queries.ts            transitional SQL templates for charts without a service
-components/registry/registry-data.ts   labels for registry codes (age bands, tenure), shared helpers
-```
-
-## Rules
-
-### Architecture
-- New registry data goes through that registry's **dashboard service**. Never add SQL against a
-  registry database to this repository, and never add registry database credentials here.
-- A chart ID belongs to exactly one service in `DASHBOARD_SERVICES`. Moving a chart to a service
-  means implementing it in the service, adding its ID there, and removing its `CHART_QUERIES` entry.
-- Service responses must use the keys the component reads (services pin them with contract tests).
-  Values are registry codes. Label them in `registry-data.ts`, and never re-bucket them in a
-  component.
-- Keep the service cache on `globalThis`: `instrumentation.ts` and the route handlers are bundled
-  separately.
-
-### Transitional SQL path
-- Do not extend it. When you have to touch it, never build a value into SQL. Filters reach it only
-  through the `--- DYNAMIC_FILTERS ---` placeholder and `$n` parameters. Column and table names come only from the
-  fixed maps in `server/elysia-app.ts`.
-
-### Filters
-- Each BFF handler (`/charts`, `/charts/:chartId`, `/dashboard-data`, `/dashboard/*`) parses filters
-  itself. A new filter has to be added to each of them, to the `filters` of every service that
-  supports it, and to the sidebar.
-
-### Configuration and secrets
-- Configuration is server-side environment only. Never use the `NEXT_PUBLIC_` prefix for URLs or
-  credentials.
-- Never commit credentials. `.env.example` holds placeholders only. Document new variables there and
-  in `docs/configuration.md`.
-
-## Before handing off
-
-```bash
-npm run lint
-npx tsc --noEmit
-```
-
-- Introduce no lint errors, and keep `npx tsc --noEmit` at 0 errors.
-- For data changes, check `/api/charts?charts=<ids>` with no filters and with a region filter:
-  `summary.failed` must be 0.
-- Update `docs/` when behaviour, configuration, a service or a chart contract changes.
-
-## Conventions
-
-- npm is the package manager. Commit `package-lock.json` with any dependency change: the image
-  installs with `npm ci`.
-- `next build` type-checks, and CI builds the image, so **any type error fails the pipeline**.
-  `npx tsc --noEmit` must report 0 errors.
-- The image is a Next.js standalone server (`output: "standalone"`) running as a non-root user on a
-  read-only root filesystem. Write only to `.next/cache` or `/tmp`.
-- Deployment: `Jenkinsfile`, `helm/oan-dashboards` (namespace `commons`; the release owns its ECR pull
-  secret), `deploy/` (the one-time deploy permission and the nginx template). Everything else goes
-  through the pipeline: never apply cluster objects by hand. See docs/deployment.md.
-- The deploy identity has a narrow role in `commons` (`deploy/k8s/commons-deploy-rbac.yaml`): no
-  Secret reads and no `pods/exec`. A new object type in the chart needs a rule there, which a
-  cluster admin applies before the deploy. Run Helm with `HELM_DRIVER=configmap`.
-- Conventional Commits (`feat(registry): …`, `fix: …`, `docs: …`).
-- Never commit `.env` files or one-off patch or replace scripts. Edit the source directly.
+- Only A2C and Grievance belong in the navigation and DASHBOARD_SERVICES catalog.
+- Do not add registry service URLs, database clients/credentials, SQL fallbacks,
+  registry chart/data/export routes, or registry background refreshes.
+- Keep the service cache on globalThis, scoped to the A2C/Grievance catalog.
+- Keep chart response keys compatible with the consuming components.
+- Configuration and credentials are server-side environment values supplied by
+  Helm/Secret references. Never put URLs or keys in NEXT_PUBLIC_ variables.
+- Use npm, retain package-lock.json, and introduce no new lint/type errors.
+- Run npm test and npx tsc --noEmit; lint changed files and report inherited debt
+  separately. Data checks need unfiltered and region-filtered chart responses
+  with summary.failed=0.
+- The standalone server runs as non-root on a read-only root filesystem. Write
+  only to .next/cache or /tmp.
+- Keep the existing Jenkins/Helm release in Commons. Use HELM_DRIVER=configmap;
+  the deploy role has no Secret reads or pods/exec. New resource types need the
+  existing deploy RBAC to cover them. Do not bypass deployment guards or apply
+  cluster objects by hand. No deployments are implied by a source change.

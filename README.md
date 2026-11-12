@@ -1,71 +1,31 @@
 # OAN Dashboards
 
-A web application that gives OpenAgriNet programme staff one screen of analytics per domain:
+Public aggregate dashboards for **Access to Credit** and **Grievance Redress**.
+Registry dashboards live in the three registry UI repositories, require registry
+IAM login, and are built/deployed by their owning registries.
 
-| Dashboard | What it shows |
-| --- | --- |
-| **Registries** | Farmer registry overview: registrations, demographics, land tenure, geographic coverage, with region → kebele drill-down on a map. Dedicated crop and livestock views |
-| **Catalogs** | National reference data: crops and varieties, livestock breeds, seed demand, administrative hierarchy, connected registries |
-| **Access to Credit** | Credit pipeline: loan applications, consent outcomes, providers, products, data sharing |
-| **DevOps** | Platform health: instances, pipelines, API traffic, databases, incidents |
+This application has no registry API connections, database credentials or SQL
+fallback. Former registry chart, data and export endpoints return 404.
+Map endpoints serve public administrative boundaries only; A2C's map uses the
+A2C chart service and its own location filters.
 
-It is a Next.js 16 application. The same process serves the React UI and a backend-for-frontend
-(BFF) API, built with Elysia and mounted under `/api`.
+## Local development
 
-## Architecture
+Copy `.env.example` to an uncommitted `.env.local`, set the A2C/Grievance service
+URLs, then run `npm ci` and `npm run dev`. Only configured services are offered.
+Gateway API keys are server-side secrets; never use a NEXT_PUBLIC_ variable.
 
-Each registry publishes its data to the dashboards through its own **dashboard service**. A
-dashboard service is a small, read-only API that owns its registry's database access and returns
-aggregate chart data over one common HTTP contract. The dashboards BFF talks only to these services
-over the private network, caches their responses, and holds no registry database credentials.
+## Verification
 
-```mermaid
-flowchart LR
-    Browser -->|/api/charts| BFF[Dashboards BFF<br/>service cache]
-    BFF --> FR[Farmer registry<br/>dashboard service]
-    BFF --> LR[Livestock registry<br/>dashboard service]
-    BFF --> CR[Crop registry<br/>dashboard service]
-    BFF -.->|more registries| X[…]
-    FR --> FRDB[(Farmer registry DB)]
-    LR --> LRDB[(Livestock registry DB)]
-    CR --> CRDB[(Crop registry DB)]
-```
+Run `npm test`, `npm run lint` and `npx tsc --noEmit`. The boundary regression
+test executes the real BFF against local HTTP fixtures and proves former registry
+routes cannot be re-enabled through old environment variables or cache entries.
+Existing inherited lint debt is documented in the PR validation results.
 
-**Service status:**
+## Deployment
 
-| Service | Status |
-| --- | --- |
-| Farmer registry dashboard service ([farmer-registry-dashboard-api](https://github.com/Centre-for-Open-Societal-Systems/farmer-registry-dashboard-api)) | In production use |
-| Livestock registry dashboard service ([livestock-registry-dashbaord-api](https://github.com/Centre-for-Open-Societal-Systems/livestock-registry-dashbaord-api)) | Serves the Livestock view |
-| Crop sown registry dashboard service ([cropsown-registry-dashboard-api](https://github.com/Centre-for-Open-Societal-Systems/cropsown-registry-dashboard-api)) | Serves the Crop view |
-
-Until then, their dashboards read a transitional dashboard database directly (see
-[Architecture](docs/architecture.md#transitional-direct-database-access)).
-
-## Quick start
-
-```bash
-cp .env.example .env    # set the dashboard service URLs; never commit real values
-npm install
-npm run dev             # http://localhost:3000
-```
-
-See [Setup and development](docs/setup-and-development.md) for running the dashboard services
-locally.
-
-## Documentation
-
-| Document | Contents |
-| --- | --- |
-| [Architecture](docs/architecture.md) | Dashboard services, BFF, caching, frontend structure, security |
-| [Dashboard services](docs/dashboard-services.md) | The service contract, adding a registry, caching behaviour |
-| [Registry dashboard](docs/registry-dashboard.md) | Farmer registry charts, filters, freshness, limitations |
-| [Data integration](docs/data-integration.md) | Chart routing, filters, response format, adding a chart |
-| [Configuration](docs/configuration.md) | Environment variables and secrets |
-| [Setup and development](docs/setup-and-development.md) | Local environment and checks |
-| [Deployment and operations](docs/deployment.md) | Container image, networking, scaling, monitoring, troubleshooting |
-| [AGENTS.md](AGENTS.md) | Rules for contributors and coding agents working in this repository |
-
-## License
-
-MIT. See [LICENSE](LICENSE).
+The existing `Jenkinsfile` and `helm/oan-dashboards` deploy this public application
+in Commons. Configure A2C/Grievance URLs and API-key Secret references there.
+This is separate from the per-registry dashboard UI/API deployment pipelines.
+See [architecture](docs/architecture.md), [configuration](docs/configuration.md)
+and [deployment](docs/deployment.md). Never apply cluster objects by hand.

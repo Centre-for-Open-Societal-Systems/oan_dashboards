@@ -7,10 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:setup": "./scripts/setup-local.sh",
-    "db:seed": "node scripts/seed-local-db.js",
-    "db:catalog": "./scripts/load-catalog-data.sh",
-    "db:devops": "./scripts/load-devops-data.sh"
+    "test": "node --test --test-isolation=none test/*.test.cjs"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.1.0",
