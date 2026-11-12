@@ -1,10 +1,13 @@
 // OAN Dashboards: build the image, push it to ECR, and deploy develop -> dev and
 // staging -> staging with Helm. See docs/deployment.md.
 pipeline {
-    agent any
+    // On-demand build agents (private subnet, ECR through the NAT); deploy runs on oan-ci-deploy.
+    agent { label 'oan-ci-build' }
 
     options {
         disableConcurrentBuilds()
+        // Agents are on-demand machines: if one is lost mid-build, run the build again.
+        retry(count: 2, conditions: [agent(), nonresumable()])
         buildDiscarder(logRotator(numToKeepStr: '30'))
     }
 
@@ -54,8 +57,12 @@ pipeline {
                     // develop and staging also move a tag of their own name, so the
                     // latest image of each environment is easy to find.
                     def moving = (env.BRANCH_NAME in ['develop', 'staging']) ? "-t ${image}:${env.BRANCH_NAME}" : ''
+                    // Agents start with an empty Docker cache: reuse layers from the branch image in ECR
+                    // (develop for other branches), which carries inline cache metadata.
+                    def cacheFrom = "${image}:${env.BRANCH_NAME in ['develop', 'staging'] ? env.BRANCH_NAME : 'develop'}"
                     sh """
                         docker build \
+                            --build-arg BUILDKIT_INLINE_CACHE=1 --cache-from ${cacheFrom} \
                             --label org.opencontainers.image.revision=${env.GIT_COMMIT} \
                             --label org.opencontainers.image.ref.name=${env.BRANCH_NAME} \
                             -t ${image}:${env.IMAGE_TAG} ${moving} .
@@ -67,7 +74,7 @@ pipeline {
         }
 
         stage('Stash chart') {
-            // Deploy runs on vpn-agent2; carry only the chart over.
+            // Deploy runs on oan-ci-deploy; carry only the chart over.
             steps {
                 stash name: 'oan-chart', includes: "${HELM_CHART_DIR}/**"
             }
@@ -87,7 +94,7 @@ pipeline {
                     branch 'staging'
                 }
             }
-            agent { label 'vpn-agent2' }
+            agent { label 'oan-ci-deploy' }
             environment {
                 KUBECONFIG_CREDENTIAL = "${env.BRANCH_NAME == 'staging' ? 'staging-farmer-kubeconfig' : 'gen2-dev-kubeconfig'}"
                 PUBLIC_HOST           = "${env.BRANCH_NAME == 'staging' ? 'oan-dashboard.oanstaging.com' : 'oan-dashboard-development.oanstaging.com'}"

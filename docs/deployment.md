@@ -50,11 +50,11 @@ All names start with the release name, so nothing collides with the `commons` pl
 
 | Stage | Where | What it does |
 | --- | --- | --- |
-| Checkout | any agent | `checkout scm` |
-| ECR Login | any agent | `aws ecr get-login-password` with credential `aws-ecr-creds`. Creates the repository `openg2p/oan-dashboards` (scan on push) if it does not exist yet |
-| Build & Push | any agent | Builds the image and pushes `<commit sha12>`. `develop` and `staging` also move a tag of their own name |
-| Stash chart | any agent | Stashes `helm/oan-dashboards` for the deploy agent |
-| Deploy (commons namespace) | `vpn-agent2`, `develop`/`staging` only | `helm upgrade --install oan-dashboards` in `commons` with the image, the environment's public host and its A2C and grievance URLs, `--wait`; `kubectl rollout status`; then a **smoke test** |
+| Checkout | `oan-ci-build` | `checkout scm` |
+| ECR Login | `oan-ci-build` | `aws ecr get-login-password` with credential `aws-ecr-creds`. Creates the repository `openg2p/oan-dashboards` (scan on push) if it does not exist yet |
+| Build & Push | `oan-ci-build` | Builds the image and pushes `<commit sha12>`. `develop` and `staging` also move a tag of their own name |
+| Stash chart | `oan-ci-build` | Stashes `helm/oan-dashboards` for the deploy agent |
+| Deploy (commons namespace) | `oan-ci-deploy`, `develop`/`staging` only | `helm upgrade --install oan-dashboards` in `commons` with the image, the environment's public host and its A2C and grievance URLs, `--wait`; `kubectl rollout status`; then a **smoke test** |
 
 **Smoke test.** Through the API server's proxy to the `oan-dashboards` Service, the pipeline calls
 `/api/health` and loads five farmer charts, plus two A2C charts and two grievance charts where
@@ -130,7 +130,7 @@ Nothing else is configured on the job:
 - `AWS_ACCOUNT_ID` is a global Jenkins variable.
 - `aws-ecr-creds`, `gen2-dev-kubeconfig` and `staging-farmer-kubeconfig` already exist and are shared
   with the farmer registry.
-- The deploy stage runs on `vpn-agent2`, which has `helm`, `kubectl` and access to both cluster APIs.
+- The deploy stage runs on `oan-ci-deploy` (on-demand agent in the cluster VPC), which has `helm`, `kubectl` and access to both cluster APIs.
 
 To recreate the folder, copy an existing registry folder: **New Item → Organization Folder**, or
 `POST /createItem?name=OAN-Dashboard` with that folder's `config.xml`. Then change the repository
