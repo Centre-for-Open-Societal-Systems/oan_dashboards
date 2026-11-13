@@ -191,7 +191,7 @@ export function TradeAnalysisCharts() {
                       color: "#7C3AED",
                     },
                   }}
-                  className="h-[350px] w-full"
+                  className="h-[300px] w-full"
                 >
                   <PieChart>
                     <Pie
@@ -233,7 +233,7 @@ export function TradeAnalysisCharts() {
                       color: "#7C3AED",
                     },
                   }}
-                  className="h-[350px] w-full"
+                  className="h-[300px] w-full"
                 >
                   <LineChart data={highTechExportsData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
@@ -271,7 +271,7 @@ export function TradeAnalysisCharts() {
                       color: "#7C3AED",
                     },
                   }}
-                  className="h-[350px] w-full"
+                  className="h-[300px] w-full"
                 >
                   <BarChart data={tariffRatesData} layout="horizontal">
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />

@@ -11,7 +11,7 @@ export const EthiopiaMapLazy = dynamic(
     ssr: false, // Don't render on server
     loading: () => (
       <Card className="border border-border/50 shadow-none">
-        <CardContent className="p-6">
+        <CardContent className="p-4">
           <div className="h-[500px] flex items-center justify-center bg-muted/20 rounded-lg">
             <div className="text-center">
               <div className="animate-pulse mb-2">

@@ -1,69 +1,19 @@
 # Configuration
 
-All configuration is read from server-side environment variables. `.env.example` lists them with
-safe placeholder values.
+All values are server-side environment variables, supplied by Helm or an
+uncommitted local environment file. Never use NEXT_PUBLIC_ for URLs or keys.
 
-## Secrets policy
-
-- **Never commit real values.** `.env` files are git-ignored. `.env.example` contains no
-  credentials.
-- **In deployed environments,** supply values from the platform's secret store (for example
-  Kubernetes Secrets).
-- **Never use `NEXT_PUBLIC_`** for any of these variables. Next.js inlines such values into the
-  browser bundle.
-- **Target state: no database credentials in the dashboards.** Each registry's database credentials
-  belong to that registry's dashboard service. The only database variables here are for the
-  transitional path (below) and will be removed.
-
-## Dashboard services
-
-Each registry dashboard service declared in `DASHBOARD_SERVICES` (`server/dashboard-services.ts`)
-reads its base URL from its own variable.
-
-| Variable | Service | Example |
-| --- | --- | --- |
-| `FARMER_REGISTRY_DASHBOARD_API_URL` | Farmer registry | `http://farmer-registry-dashboard-api.far` (in-cluster) |
-| `LIVESTOCK_REGISTRY_DASHBOARD_API_URL` | Livestock registry | `http://livestock-registry-dashboard-api.live` (in-cluster) |
-| `CROPSOWN_REGISTRY_DASHBOARD_API_URL` | Crop sown registry | `http://cropsown-registry-dashboard-api.crop` (in-cluster) |
-| `A2C_DASHBOARD_API_URL` | Access to Credit, served by the A2C platform | `http://localhost:8000` (the A2C site's base URL) |
-| `A2C_DASHBOARD_API_CHARTS_PATH` | Path of the A2C charts under that URL. Default `/api/v1/charts`, which is how Frappe serves them. Set `/v1/charts` when the URL is A2C's Kong gateway, which exposes the REST API without the `/api` prefix | `/v1/charts` |
-| *one variable per additional registry service* | as declared in `DASHBOARD_SERVICES` | |
-
-- The URL must be reachable from the dashboards server. It is not used by browsers.
-- If a service's variable is not set, its charts report an error and the rest of the dashboards
-  keep working. The crop and livestock views are offered only when their service's variable is set;
-  otherwise the Farming Type filter keeps the overview. The Access to Credit dashboard is offered
-  only when `A2C_DASHBOARD_API_URL` is set.
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `DASHBOARD_CACHE_TTL_SECONDS` | `900` | How long a service response is cached, and how often the unfiltered charts are refreshed in the background. Minimum 60 |
-
-## Transitional: direct database access
-
-These are needed only while the Catalogs and DevOps dashboards have no dashboard
-service yet. **Leave `DATABASE_URL` unset to run with registry data only:** `/api/config` then
-offers only the Registries dashboard, and nothing tries to reach a database.
-
-| Variable | Description |
+| Variable | Purpose |
 | --- | --- |
-| `DATABASE_URL` | PostgreSQL URL of the transitional dashboard database. Use a read-only role |
-| `FARMER_DATABASE_URL` | Legacy direct access to the farmer registry database. Not used by the Registries dashboard; leave unset |
+| A2C_DASHBOARD_API_URL | A2C base URL; unset hides A2C |
+| A2C_DASHBOARD_API_CHARTS_PATH | Chart prefix, default /api/v1/charts; Kong may use /v1/charts |
+| A2C_DASHBOARD_API_KEY | Optional gateway key, from a Secret |
+| GRIEVANCE_DASHBOARD_API_URL | Grievance base URL; unset hides Grievance |
+| GRIEVANCE_DASHBOARD_API_KEY | Optional gateway key, from a Secret |
+| DASHBOARD_CACHE_TTL_SECONDS | Shared row refresh TTL, default 900, minimum 60 |
 
-Pool settings for these connections are in `lib/config.ts`: up to 20 connections per pool, a
-3-second connect timeout, and TCP keep-alive.
-
-## Server
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `PORT` | `3000` | HTTP port |
-| `NODE_ENV` | set by `next start` | `production` in the container image |
-
-## Build-time settings (`next.config.ts`)
-
-| Setting | Value | Note |
-| --- | --- | --- |
-| `compress` | `true` | gzip responses |
-| `poweredByHeader` | `false` | Hides the framework header |
-| `X-Frame-Options`, `Content-Security-Policy: frame-ancestors` | `ALLOWALL`, `*` | Lets a portal embed the dashboards. Restrict `frame-ancestors` to the portal origins in production |
+The `helm/oan-dashboards` chart supplies service URLs through dashboardServices
+and API keys through serviceKeysSecret. Old registry service variables and
+DATABASE_URL/FARMER_DATABASE_URL have no application consumer and cannot enable
+registry data access. Remove obsolete variables and Secret references during
+the reviewed deployment; never print their values.

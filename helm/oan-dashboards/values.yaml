@@ -22,28 +22,33 @@ imagePullSecrets: []
 
 replicas: 1
 
-# Registry dashboard services, as reachable from the pod. One entry per
+# Public aggregate services, as reachable from the pod. One entry per
 # service declared in server/dashboard-services.ts (key = its URL variable).
 dashboardServices:
-  FARMER_REGISTRY_DASHBOARD_API_URL: http://farmer-registry-dashboard-api.far
-  LIVESTOCK_REGISTRY_DASHBOARD_API_URL: http://livestock-registry-dashboard-api.live
-  CROPSOWN_REGISTRY_DASHBOARD_API_URL: http://cropsown-registry-dashboard-api.crop
   # The A2C platform's base URL. Left empty, the Access to Credit dashboard is
   # not offered; set it per environment.
   A2C_DASHBOARD_API_URL: ""
   # Path of the A2C charts under that URL. Empty means /api/v1/charts (Frappe
   # directly); set /v1/charts when the URL is A2C's Kong gateway.
   A2C_DASHBOARD_API_CHARTS_PATH: ""
+  # The grievance service's base URL. Left empty, the Grievance Redress
+  # dashboard is not offered; set it per environment.
+  GRIEVANCE_DASHBOARD_API_URL: ""
 
 # Seconds a dashboard service response is cached (and the warm-up interval).
 cacheTtlSeconds: 900
 
 # Extra environment variables, as NAME: value. Values may use templates.
-# The transitional database (DATABASE_URL) is deliberately absent: without it
-# only the Registries dashboard is offered. Supply it from a Secret via
-# envFrom when the other dashboards are enabled.
+# Only services with configured URLs are offered. This application has no
+# database credentials or SQL fallback.
 env: {}
 envFrom: []
+
+# Secret holding the API keys the services' Kong gateways expect, one variable
+# per service (A2C_DASHBOARD_API_KEY, GRIEVANCE_DASHBOARD_API_KEY). Created once
+# per cluster by an admin (deploy/k8s/service-keys-secret.example.yaml), since the
+# deploy role cannot update Secrets; mounted optionally, so it may not exist yet.
+serviceKeysSecret: ""
 
 resources:
   requests:

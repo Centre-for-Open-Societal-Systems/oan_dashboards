@@ -215,7 +215,7 @@ export function ExportDataButton({
         disabled={state === "busy"}
         aria-label="Export this dashboard"
         title="Export this dashboard as image, PDF or CSV"
-        className="inline-flex flex-none items-center gap-1 rounded-md border bg-white px-2 py-[3px] text-[10px] font-semibold outline-none transition-colors hover:bg-[#F2F8F4] disabled:cursor-progress"
+        className="inline-flex flex-none items-center gap-1 rounded-md border bg-white px-2 py-[3px] text-[11px] font-semibold outline-none transition-colors hover:bg-[#F2F8F4] disabled:cursor-progress"
         style={{
           borderColor: isError ? REGISTRY_COLORS.red : REGISTRY_COLORS.line,
           color: isError ? REGISTRY_COLORS.red : REGISTRY_COLORS.g700,
@@ -229,15 +229,15 @@ export function ExportDataButton({
       <DropdownMenuContent align="end" sideOffset={6} className="min-w-[168px]">
         <DropdownMenuLabel className="text-[11px] text-muted-foreground">Export as</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="gap-2 text-[13px]" onSelect={() => runExport("image")}>
+        <DropdownMenuItem className="gap-2 text-sm" onSelect={() => runExport("image")}>
           <ImageIcon className="h-4 w-4" />
           Image (PNG)
         </DropdownMenuItem>
-        <DropdownMenuItem className="gap-2 text-[13px]" onSelect={() => runExport("pdf")}>
+        <DropdownMenuItem className="gap-2 text-sm" onSelect={() => runExport("pdf")}>
           <FileText className="h-4 w-4" />
           PDF document
         </DropdownMenuItem>
-        <DropdownMenuItem className="gap-2 text-[13px]" onSelect={() => runExport("csv")}>
+        <DropdownMenuItem className="gap-2 text-sm" onSelect={() => runExport("csv")}>
           <Sheet className="h-4 w-4" />
           CSV data
         </DropdownMenuItem>
