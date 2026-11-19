@@ -1,0 +1,12 @@
+# New Dev (develop -> dev cluster, namespace commons). The Jenkinsfile deploys the packaged chart with this
+# overlay, and oan-helm's rollback command for a develop version uses it too. The image is in the packaged values.
+ingress:
+  public:
+    enabled: true
+    host: oan-dashboard-development.oanstaging.com
+# A2C is read only through its Kong gateway, which exposes the REST API as /v1/...
+dashboardServices:
+  A2C_DASHBOARD_API_URL: https://a2c-develop-gateway.oanstaging.com
+  A2C_DASHBOARD_API_CHARTS_PATH: /v1/charts
+  GRIEVANCE_DASHBOARD_API_URL: https://grievance-dev.oanstaging.com
+serviceKeysSecret: oan-dashboards-service-keys
