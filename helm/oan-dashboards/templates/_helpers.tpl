@@ -9,7 +9,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{- define "oan-dashboards.labels" -}}
 {{ include "oan-dashboards.selectorLabels" . }}
-app.kubernetes.io/version: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
+{{- /* The image may be pinned as tag@sha256:digest; a label value allows neither '@' nor ':' and at most 63
+characters, so the label carries the tag part only. */}}
+app.kubernetes.io/version: {{ .Values.image.tag | default .Chart.AppVersion | toString | splitList "@" | first | replace ":" "-" | trunc 63 | trimSuffix "-" | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- end -}}
