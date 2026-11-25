@@ -20,7 +20,7 @@ the build context. The chart runs the container with a read-only root filesystem
 
 | Value | Default | Purpose |
 | --- | --- | --- |
-| `image.repository`, `image.tag` | — (required) | Set by CI |
+| `image.repository`, `image.tag` | — (required) | Set by CI: `eoan/oan_dashboards/oan-dashboards`, tag `<appVersion>-<branch>.<build>@sha256:<digest>` |
 | `dashboardServices` | `A2C_DASHBOARD_API_URL` and `GRIEVANCE_DASHBOARD_API_URL` empty | One URL variable per dashboard service. An empty URL hides that dashboard. CI sets the A2C and grievance URLs per environment |
 | `cacheTtlSeconds` | `900` | `DASHBOARD_CACHE_TTL_SECONDS` |
 | `env`, `envFrom` | empty | Extra variables. Use Secret references for the A2C and Grievance service keys |
@@ -51,10 +51,11 @@ All names start with the release name, so nothing collides with the `commons` pl
 | Stage | Where | What it does |
 | --- | --- | --- |
 | Checkout | `oan-ci-build` | `checkout scm` |
-| ECR Login | `oan-ci-build` | `aws ecr get-login-password` with credential `aws-ecr-creds`. Creates the repository `openg2p/oan-dashboards` (scan on push) if it does not exist yet |
-| Build & Push | `oan-ci-build` | Builds the image and pushes `<commit sha12>`. `develop` and `staging` also move a tag of their own name |
-| Stash chart | `oan-ci-build` | Stashes `helm/oan-dashboards` for the deploy agent |
-| Deploy (commons namespace) | `oan-ci-deploy`, `develop`/`staging` only | `helm upgrade --install oan-dashboards` in `commons` with the image, the environment's public host and its A2C and grievance URLs, `--wait`; `kubectl rollout status`; then a **smoke test** |
+| ECR Login | `oan-ci-build` | `aws ecr get-login-password` with credential `aws-ecr-creds`. Creates the repository `eoan/oan_dashboards/oan-dashboards` (scan on push) if it does not exist yet |
+| Build & Push | `oan-ci-build` | Builds the image and pushes `<Chart.yaml appVersion>-<branch>.<build>` (e.g. `0.0.0-develop.42`). `develop` and `staging` also move a tag of their own name. Records the pushed digest in `build-outcomes/images.tsv` |
+| Package chart | `oan-ci-deploy`, `develop` only | oan-helm `scripts/ci/package_chart.py`: packages `helm/oan-dashboards` as `0.0.0-develop.<commit count>` with the image pinned as `tag@digest` and the source annotations oan-helm records |
+| Deploy (commons namespace) | `oan-ci-deploy`, `develop`/`staging` only | `helm upgrade --install oan-dashboards` in `commons`, `--wait`: on `develop` the packaged archive with `helm/oan-dashboards/values-dev.yaml`; on `staging` the chart directory with the image, public host and A2C and grievance URLs. Then `kubectl rollout status` and a **smoke test** |
+| Publish chart to oan-helm | `oan-ci-deploy`, `develop` only | oan-helm `scripts/ci/publish_chart.py` with credential `oan-helm-fork-token`: adds the deployed archive to `repository/develop/` of oan-helm. A failure leaves the build UNSTABLE; a rerun of an already published version is not an error |
 
 **Smoke test.** Through the API server's proxy to the `oan-dashboards` Service, the pipeline calls
 `/api/health` and loads five farmer charts, plus two A2C charts and two grievance charts where
@@ -140,10 +141,10 @@ filter, the branch filter and the display name as in the table above.
 
 ### ECR repository
 
-The pipeline creates `openg2p/oan-dashboards` in `ap-south-1` on its first build. If the IAM user
+The pipeline creates `eoan/oan_dashboards/oan-dashboards` in `ap-south-1` on its first build. If the IAM user
 behind `aws-ecr-creds` may push but not create repositories, the build stops with a clear message.
 Create the repository once by hand in that case. The cluster nodes' IAM role must be able to pull
-from it, as for `openg2p/farmer-registry/*`.
+from it, as for the registries' `eoan/*` repositories.
 
 ### Deploy permission (once per cluster)
 
